@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
 function collectPageErrors(page) {
   const errors = [];
@@ -11,6 +13,46 @@ async function useFixture(page, title, path) {
     contentType: 'text/javascript',
     body: `export const title = ${JSON.stringify(title)}; export const path = ${JSON.stringify(path)};`,
   }));
+}
+
+async function useScrollFixture(page, { normalMode = false } = {}) {
+  await useFixture(page, 'Transcript scrolling fixture', 'test-fixtures/transcript-scroll');
+  if (normalMode) {
+    await page.route(/\/lib\/script\.js\?v=.*/, async route => {
+      const source = await readFile(path.join(process.cwd(), 'lib/script.js'), 'utf8');
+      await route.fulfill({
+        contentType: 'text/javascript',
+        body: source.replace(
+          "let devMode = (window.location.port.length > 0) || (window.location.search.indexOf('dev') > 0);",
+          'let devMode = false;',
+        ),
+      });
+    });
+  }
+  const filler = Array.from({ length: 18 }, (_, index) => `Paragraph ${index + 1}: ${'long transcript content '.repeat(8)}`).join('\n\n');
+  const pages = {
+    '1': `# Scroll fixture start\n\n${filler}\n\n- [Continue by ordinary choice](2)\n- [Rejected choice](4)`,
+    '2': `## Ordinary scroll destination\n\n${filler}\n\n- [Open scripted choice](3)`,
+    '3': `## Scripted scroll passage\n\n${filler}\n\n<script>\nconst answer = await presentChoice([['accept', 'Accept scripted choice'], ['reject', 'Reject scripted choice']]);\nprint('Settled scripted output: ' + answer);\nawait goToPage('5');\n</script>\n\n<div condition="false">[Graph destination](5)</div>`,
+    '4': '# Rejected destination',
+    '5': `## Programmatic scroll destination\n\n${filler}\n\nFinal scripted destination.`,
+  };
+  await page.route(/\/test-fixtures\/transcript-scroll\/([^/?]+)\.md\?.*/, route => {
+    const pageId = new URL(route.request().url()).pathname.split('/').pop().replace(/\.md$/, '');
+    return pages[pageId]
+      ? route.fulfill({ contentType: 'text/markdown', body: pages[pageId] })
+      : route.fulfill({ status: 404, body: 'Missing fixture page' });
+  });
+}
+
+async function passageIsVisible(page, pageId) {
+  return page.locator(`.story-passage[data-page-id="${pageId}"]`).evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    const viewport = document.body.classList.contains('dev')
+      ? document.querySelector('#game_pane').getBoundingClientRect()
+      : { top: 0, bottom: window.innerHeight };
+    return rect.top >= viewport.top && rect.top < viewport.bottom;
+  });
 }
 
 test('initial page renders', async ({ page }) => {
@@ -466,6 +508,94 @@ test('development layout has only the transcript scrollbar', async ({ page }) =>
   expect(layout.htmlScrollHeight).toBe(layout.htmlClientHeight);
   expect(layout.bodyScrollHeight).toBe(layout.bodyClientHeight);
   expect(layout.gameOverflowY).toBe('auto');
+});
+
+test('pointer choice scrolls the development transcript to the appended passage', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 420 });
+  await useScrollFixture(page);
+  await page.goto('/?dev');
+  const before = await page.locator('#game_pane').evaluate(element => element.scrollTop);
+
+  await page.getByText('Continue by ordinary choice').click();
+
+  await expect(page.getByRole('heading', { name: 'Ordinary scroll destination' })).toHaveCount(1);
+  await expect.poll(() => page.locator('#game_pane').evaluate(element => element.scrollTop)).toBeGreaterThan(before);
+  await expect.poll(() => passageIsVisible(page, '2')).toBe(true);
+  const layout = await page.evaluate(() => ({
+    htmlOverflowY: getComputedStyle(document.documentElement).overflowY,
+    bodyScrollable: document.body.scrollHeight > document.body.clientHeight,
+  }));
+  expect(layout).toEqual({ htmlOverflowY: 'hidden', bodyScrollable: false });
+});
+
+test('normal playback scrolls only the body to the appended passage', async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 420 });
+  await useScrollFixture(page, { normalMode: true });
+  await page.goto('/');
+  const before = await page.evaluate(() => document.body.scrollTop);
+
+  await page.getByText('Continue by ordinary choice').click();
+
+  await expect(page.getByRole('heading', { name: 'Ordinary scroll destination' })).toHaveCount(1);
+  await expect.poll(() => page.evaluate(() => document.body.scrollTop)).toBeGreaterThan(before);
+  await expect.poll(() => passageIsVisible(page, '2')).toBe(true);
+  const layout = await page.evaluate(() => ({
+    htmlOverflowY: getComputedStyle(document.documentElement).overflowY,
+    bodyOverflowY: getComputedStyle(document.body).overflowY,
+    bodyScrollable: document.body.scrollHeight > document.body.clientHeight,
+    gameOverflowY: getComputedStyle(document.querySelector('#game_pane')).overflowY,
+    gameScrollable: document.querySelector('#game_pane').scrollHeight > document.querySelector('#game_pane').clientHeight,
+  }));
+  expect(layout).toEqual({
+    htmlOverflowY: 'hidden',
+    bodyOverflowY: 'auto', bodyScrollable: true,
+    gameOverflowY: 'visible', gameScrollable: false,
+  });
+});
+
+test('keyboard choice focuses and scrolls to the appended passage', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 420 });
+  await useScrollFixture(page);
+  await page.goto('/?dev');
+  await expect(page.getByRole('heading', { name: 'Scroll fixture start' })).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(page.locator(':focus')).toHaveText('Continue by ordinary choice');
+  await page.keyboard.press('Enter');
+
+  const destination = page.locator('.story-passage[data-page-id="2"]');
+  await expect(destination).toBeFocused();
+  expect(await passageIsVisible(page, '2')).toBe(true);
+  await expect(page.getByText('Rejected choice')).toHaveAttribute('tabindex', '-1');
+});
+
+test('scripted choice and goToPage scroll to one settled destination', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 420 });
+  await useScrollFixture(page);
+  await page.goto('/?dev');
+  await page.getByText('Continue by ordinary choice').click();
+  await page.getByText('Open scripted choice').click();
+  const before = await page.locator('#game_pane').evaluate(element => element.scrollTop);
+  await page.getByRole('button', { name: 'Accept scripted choice' }).click();
+
+  await expect(page.getByText('Settled scripted output: accept')).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: 'Programmatic scroll destination' })).toHaveCount(1);
+  await expect.poll(() => page.locator('#game_pane').evaluate(element => element.scrollTop)).toBeGreaterThan(before);
+  await expect.poll(() => passageIsVisible(page, '5')).toBe(true);
+  const replayHistory = await page.evaluate(() => LZString.decompressFromEncodedURIComponent(location.hash.slice(1)).split(','));
+  expect(replayHistory.filter(token => token === 'accept')).toHaveLength(1);
+  expect(replayHistory.filter(token => token === '5')).toHaveLength(1);
+});
+
+test('reduced motion scroll settles immediately at the appended passage', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 1280, height: 420 });
+  await useScrollFixture(page);
+  await page.goto('/?dev');
+  await page.getByText('Continue by ordinary choice').click();
+
+  await expect(page.getByRole('heading', { name: 'Ordinary scroll destination' })).toHaveCount(1);
+  expect(await passageIsVisible(page, '2')).toBe(true);
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior)).toBe('auto');
 });
 
 test('scripted choices retain native button keyboard behavior', async ({ page }) => {
