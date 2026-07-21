@@ -61,3 +61,16 @@ random seed preserves deterministic outcomes during restoration.
 
 Browser history records settled, user-visible story checkpoints rather than
 intermediate asynchronous steps. Existing story URLs remain compatible.
+
+Story errors
+------------
+
+In development mode, story errors are shown with their Markdown page and source
+context. Missing pages, script errors, condition errors, and expression errors
+are reported separately; a valid false condition remains silent and simply
+hides its content. Asynchronous page-script failures are tracked through the
+same reporting path.
+
+The browser console contains the structured error object and full developer
+details. Outside development mode, readers see only a restrained story-error
+message rather than an internal stack trace.
