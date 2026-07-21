@@ -15,7 +15,7 @@ async function useStoryFixture(page) {
   }));
 }
 
-async function forceNormalMode(page) {
+async function forceNormalMode(page, pollIntervalMs = null) {
   await page.route(/\/lib\/script\.js\?v=.*/, async route => {
     const source = await readFile(path.join(process.cwd(), 'lib/script.js'), 'utf8');
     await route.fulfill({
@@ -23,6 +23,24 @@ async function forceNormalMode(page) {
       body: source.replace(
         "let devMode = (window.location.port.length > 0) || (window.location.search.indexOf('dev') > 0);",
         'let devMode = false;',
+      ).replace(
+        'client: createBrowserAnalysisClient(),',
+        pollIntervalMs === null
+          ? 'client: createBrowserAnalysisClient(),'
+          : `client: createBrowserAnalysisClient({ pollIntervalMs: ${pollIntervalMs} }),`,
+      ),
+    });
+  });
+}
+
+async function usePollingInterval(page, pollIntervalMs = 50) {
+  await page.route(/\/lib\/script\.js\?v=.*/, async route => {
+    const source = await readFile(path.join(process.cwd(), 'lib/script.js'), 'utf8');
+    await route.fulfill({
+      contentType: 'text/javascript',
+      body: source.replace(
+        'client: createBrowserAnalysisClient(),',
+        `client: createBrowserAnalysisClient({ pollIntervalMs: ${pollIntervalMs} }),`,
       ),
     });
   });
@@ -46,6 +64,46 @@ async function expectPlayerUsable(page) {
   await page.locator('.pagelink', { hasText: 'Take route A' }).click();
   await expect(page.getByText('Route A set abandoned to true.')).toBeVisible();
 }
+
+test('background polling recovers from the Live Server publication race', async ({ page }) => {
+  await useStoryFixture(page);
+  await usePollingInterval(page);
+  const validA = await fixture('valid-a.json');
+  const validB = await fixture('valid-b.json');
+  let newerPublicationAvailable = false;
+  const getRequests = await analysisRoute(page, route => fulfillJson(route, newerPublicationAvailable ? validB : validA));
+
+  await page.goto('/?dev');
+  await expect(page.locator('#project-analysis-summary')).toContainText('13 pages');
+  await page.locator('.pagelink', { hasText: 'Take route A' }).click();
+  await expect(page.getByText('Route A set abandoned to true.')).toBeVisible();
+  await page.getByRole('button', { name: 'Refresh project analysis' }).focus();
+  const before = await page.evaluate(() => ({
+    hash: location.hash,
+    transcript: document.querySelector('#content').textContent,
+    passages: document.querySelectorAll('.story-passage').length,
+    runtime: document.querySelector('#state-container').textContent,
+    route: [...document.querySelectorAll('#graph-container .active')].map(element => element.id),
+    scrollTop: document.querySelector('#game_pane').scrollTop,
+    focused: document.activeElement?.getAttribute('aria-label'),
+    navigations: performance.getEntriesByType('navigation').length,
+  }));
+
+  newerPublicationAvailable = true;
+  await expect(page.locator('#project-analysis-summary')).toContainText('14 pages');
+  await expect(page.locator('#project-analysis-summary')).toContainText('2 errors');
+  expect(getRequests()).toBeGreaterThanOrEqual(2);
+  expect(await page.evaluate(() => ({
+    hash: location.hash,
+    transcript: document.querySelector('#content').textContent,
+    passages: document.querySelectorAll('.story-passage').length,
+    runtime: document.querySelector('#state-container').textContent,
+    route: [...document.querySelectorAll('#graph-container .active')].map(element => element.id),
+    scrollTop: document.querySelector('#game_pane').scrollTop,
+    focused: document.activeElement?.getAttribute('aria-label'),
+    navigations: performance.getEntriesByType('navigation').length,
+  }))).toEqual(before);
+});
 
 test('development mode loads valid analysis without changing the player', async ({ page }) => {
   await useStoryFixture(page);
@@ -93,6 +151,20 @@ test('normal mode makes no analysis request and playback still works', async ({ 
   await expect(page.getByText('Route A set abandoned to true.')).toBeVisible();
   expect(requests).toBe(0);
   expect(consoleErrors).toEqual([]);
+});
+
+test('normal mode does not start background polling', async ({ page }) => {
+  await useStoryFixture(page);
+  await forceNormalMode(page, 40);
+  let requests = 0;
+  await page.route(/\/\.story-tools\/analysis\.json/, route => { requests += 1; return route.abort(); });
+
+  await page.goto('/');
+  await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 140)));
+  expect(requests).toBe(0);
+  await expect(page.locator('#project-analysis-summary')).toHaveCount(0);
+  await page.locator('.pagelink', { hasText: 'Take route A' }).click();
+  await expect(page.getByText('Route A set abandoned to true.')).toBeVisible();
 });
 
 test('missing analysis is a quiet unavailable state', async ({ page }) => {
@@ -221,29 +293,231 @@ test('focus and visibility refreshes are debounced without moving focus', async 
   expect(getRequests()).toBe(2);
 });
 
-test('an older request resolving last cannot replace newer analysis', async ({ page }) => {
+test('active requests do not overlap and closely spaced triggers coalesce once', async ({ page }) => {
   await useStoryFixture(page);
+  await usePollingInterval(page, 1000);
   const validA = await fixture('valid-a.json');
   const validB = await fixture('valid-b.json');
-  let releaseOlder;
-  const olderHeld = new Promise(resolve => { releaseOlder = resolve; });
-  await analysisRoute(page, async (route, request) => {
-    if (request === 1) return fulfillJson(route, validA);
-    if (request === 2) {
-      await olderHeld;
-      return fulfillJson(route, validA);
+  let releaseActive;
+  const activeHeld = new Promise(resolve => { releaseActive = resolve; });
+  let active = 0;
+  let maximumActive = 0;
+  const getRequests = await analysisRoute(page, async (route, request) => {
+    active += 1;
+    maximumActive = Math.max(maximumActive, active);
+    try {
+      if (request === 1) return await fulfillJson(route, validA);
+      if (request === 2) {
+        await activeHeld;
+        return await fulfillJson(route, validA);
+      }
+      return await fulfillJson(route, validB);
+    } finally {
+      active -= 1;
     }
-    return fulfillJson(route, validB);
   });
   await page.goto('/?dev');
   const refresh = page.getByRole('button', { name: 'Refresh project analysis' });
   await expect(page.locator('#project-analysis-summary')).toContainText('13 pages');
   await refresh.click();
+  await expect.poll(getRequests).toBe(2);
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('focus'));
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
   await refresh.click();
-  await expect(page.locator('#project-analysis-summary')).toContainText('14 pages');
-  releaseOlder();
+  expect(getRequests()).toBe(2);
+  expect(maximumActive).toBe(1);
+  releaseActive();
+  await expect.poll(getRequests).toBe(3);
   await expect(refresh).toHaveAttribute('aria-busy', 'false');
   await expect(page.locator('#project-analysis-summary')).toContainText('14 pages');
+  expect(maximumActive).toBe(1);
+  expect(getRequests()).toBe(3);
+});
+
+test('an unavailable initial publication recovers through polling', async ({ page }) => {
+  await useStoryFixture(page);
+  await usePollingInterval(page);
+  const valid = await fixture('valid-a.json');
+  let available = false;
+  const warnings = [];
+  page.on('console', message => { if (message.type() === 'warning') warnings.push(message.text()); });
+  const getRequests = await analysisRoute(page, route => available
+    ? fulfillJson(route, valid)
+    : route.fulfill({ status: 404 }));
+
+  await page.goto('/?dev');
+  await expect(page.locator('#project-analysis-summary')).toContainText('Project analysis unavailable');
+  available = true;
+  await expect(page.locator('#project-analysis-summary')).toContainText('13 pages');
+  expect(getRequests()).toBeGreaterThanOrEqual(2);
+  expect(warnings).toEqual([]);
+  await expect(page.locator('#graph-container svg')).toBeVisible();
+});
+
+test('polling pauses while hidden and refreshes immediately when visible', async ({ page }) => {
+  await useStoryFixture(page);
+  await usePollingInterval(page, 40);
+  const valid = await fixture('valid-a.json');
+  let holdVisibleRefresh = false;
+  let releaseVisibleRefresh;
+  const visibleRefreshHeld = new Promise(resolve => { releaseVisibleRefresh = resolve; });
+  const getRequests = await analysisRoute(page, async route => {
+    if (holdVisibleRefresh) await visibleRefreshHeld;
+    return fulfillJson(route, valid);
+  });
+  await page.goto('/?dev');
+  const refresh = page.getByRole('button', { name: 'Refresh project analysis' });
+  await expect(refresh).toHaveAttribute('aria-busy', 'false');
+  await refresh.focus();
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  const hiddenCount = getRequests();
+  await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 130)));
+  expect(getRequests()).toBe(hiddenCount);
+
+  holdVisibleRefresh = true;
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('focus'));
+  });
+  await expect.poll(getRequests).toBeGreaterThan(hiddenCount);
+  expect(getRequests()).toBe(hiddenCount + 1);
+  await expect(refresh).toBeFocused();
+  releaseVisibleRefresh();
+  await expect.poll(getRequests).toBeGreaterThan(hiddenCount + 1);
+});
+
+test('repeated hashes stay stable, a new hash renders once, and polling continues', async ({ page }) => {
+  await useStoryFixture(page);
+  await usePollingInterval(page);
+  const validA = await fixture('valid-a.json');
+  const validB = await fixture('valid-b.json');
+  let useB = false;
+  const getRequests = await analysisRoute(page, route => fulfillJson(route, useB ? validB : validA));
+  await page.goto('/?dev');
+  const counts = page.locator('#project-analysis-counts');
+  await expect(counts).toContainText('13 pages');
+  const original = await counts.elementHandle();
+  const originalStatus = await page.locator('#project-analysis-status').textContent();
+  await page.locator('.project-analysis-pages').evaluate(element => {
+    element.dataset.mutations = '0';
+    new MutationObserver(() => {
+      element.dataset.mutations = String(Number(element.dataset.mutations) + 1);
+    }).observe(element, { childList: true, characterData: true, subtree: true });
+  });
+  await expect.poll(getRequests).toBeGreaterThanOrEqual(3);
+  expect(await page.evaluate(([first, current]) => first === current, [original, await counts.elementHandle()])).toBe(true);
+  expect(await page.locator('#project-analysis-status').textContent()).toBe(originalStatus);
+
+  useB = true;
+  await expect(counts).toContainText('14 pages');
+  const updated = await counts.elementHandle();
+  const requestsAfterUpdate = getRequests();
+  await expect.poll(getRequests).toBeGreaterThan(requestsAfterUpdate + 1);
+  expect(await page.evaluate(([first, current]) => first === current, [updated, await counts.elementHandle()])).toBe(true);
+  await expect(counts).toContainText('14 pages');
+  await expect(page.locator('.project-analysis-pages')).toHaveAttribute('data-mutations', '1');
+});
+
+test('failed and malformed polls retain or recover analysis automatically', async ({ page }) => {
+  await useStoryFixture(page);
+  await usePollingInterval(page);
+  const validA = await fixture('valid-a.json');
+  const validB = await fixture('valid-b.json');
+  let response = 'valid-a';
+  const warnings = [];
+  const pageErrors = [];
+  page.on('console', message => { if (message.type() === 'warning') warnings.push(message.text()); });
+  page.on('pageerror', error => pageErrors.push(error));
+  const getRequests = await analysisRoute(page, route => {
+    if (response === 'error') return route.fulfill({ status: 503 });
+    if (response === 'malformed') return fulfillJson(route, '{broken');
+    return fulfillJson(route, response === 'valid-b' ? validB : validA);
+  });
+  await page.goto('/?dev');
+  await expect(page.locator('#project-analysis-summary')).toContainText('13 pages');
+  response = 'error';
+  await expect(page.locator('#project-analysis-summary')).toContainText('may be out of date');
+  await expect(page.locator('#project-analysis-summary')).toContainText('13 pages');
+  response = 'malformed';
+  await expect.poll(() => warnings.filter(message => message.startsWith('Project analysis could not be read:')).length).toBe(2);
+  const malformedRequests = getRequests();
+  await expect.poll(getRequests).toBeGreaterThan(malformedRequests);
+  expect(warnings.filter(message => message.startsWith('Project analysis could not be read:'))).toHaveLength(2);
+  response = 'valid-b';
+  await expect(page.locator('#project-analysis-summary')).toContainText('14 pages');
+  await expect(page.locator('#project-analysis-summary')).not.toContainText('may be out of date');
+  expect(pageErrors).toEqual([]);
+});
+
+test('disposing the client cancels scheduling, listeners, and obsolete responses', async ({ page }) => {
+  const valid = JSON.parse(await fixture('valid-a.json'));
+  await page.goto('/');
+  const result = await page.evaluate(async model => {
+    const { createBrowserAnalysisClient } = await import(`/lib/browser-analysis-client.js?dispose=${Date.now()}`);
+    const fakeDocument = Object.assign(new EventTarget(), { hidden: false });
+    const fakeWindow = new EventTarget();
+    const timers = new Map();
+    let nextTimer = 0;
+    let requests = 0;
+    const client = createBrowserAnalysisClient({
+      documentObject: fakeDocument,
+      windowObject: fakeWindow,
+      pollIntervalMs: 10,
+      fetchImplementation: async () => {
+        requests += 1;
+        return new Response(JSON.stringify(model), { status: 200 });
+      },
+      setTimeoutImplementation: callback => {
+        const id = ++nextTimer;
+        timers.set(id, callback);
+        return id;
+      },
+      clearTimeoutImplementation: id => timers.delete(id),
+    });
+    await client.start();
+    const scheduledBeforeDispose = timers.size;
+    client.dispose();
+    for (const callback of timers.values()) callback();
+    fakeWindow.dispatchEvent(new Event('focus'));
+    fakeDocument.dispatchEvent(new Event('visibilitychange'));
+
+    let release;
+    const held = new Promise(resolve => { release = resolve; });
+    const obsoleteStates = [];
+    const obsolete = createBrowserAnalysisClient({
+      documentObject: fakeDocument,
+      windowObject: fakeWindow,
+      fetchImplementation: async () => {
+        await held;
+        return new Response(JSON.stringify(model), { status: 200 });
+      },
+      setTimeoutImplementation: callback => {
+        const id = ++nextTimer;
+        timers.set(id, callback);
+        return id;
+      },
+      clearTimeoutImplementation: id => timers.delete(id),
+    });
+    obsolete.subscribe(state => obsoleteStates.push(state.status));
+    const obsoleteRequest = obsolete.start();
+    obsolete.dispose();
+    release();
+    await obsoleteRequest;
+    return { requests, scheduledBeforeDispose, timersAfterDispose: timers.size, obsoleteStates };
+  }, valid);
+
+  expect(result).toEqual({
+    requests: 1,
+    scheduledBeforeDispose: 1,
+    timersAfterDispose: 0,
+    obsoleteStates: ['idle', 'loading'],
+  });
 });
 
 test('hostile publication text is rendered as inert text', async ({ page }) => {

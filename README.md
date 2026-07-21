@@ -30,8 +30,12 @@ In development mode, the graph pane also reads the optional generated snapshot
 unreachable-page, and missing-target counts above the gameplay graph. The BIF
 VS Code extension generates this file after analysis. Use the summary's
 **Refresh** button, or return focus to the browser window, to reload it without
-reloading the story. Normal playback never requests the file, so static reader
-deployment remains independent of the extension and Node.js.
+reloading the story. While the development tab is visible, it also checks for a
+new publication about every two seconds; polling pauses in hidden tabs and an
+immediate check runs when the tab becomes visible again. This closes the timing
+gap where Live Server reloads before the extension finishes publishing, without
+requiring another reload. Normal playback never requests or polls the file, so
+static reader deployment remains independent of the extension and Node.js.
 
 This is only a summary of project analysis; Project graph mode is not yet
 implemented. The standalone `.story-tools/graph.html` export remains available
