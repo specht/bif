@@ -1,0 +1,53 @@
+{
+  "name": "bif-authoring-tools",
+  "displayName": "BIF Authoring Tools",
+  "description": "Diagnostics and a complete authoring graph for BIF Markdown interactive-fiction projects.",
+  "version": "0.1.0",
+  "publisher": "gymnasiumsteglitz",
+  "license": "MIT",
+  "icon": "resources/icon.png",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Education", "Visualization", "Linters"],
+  "keywords": ["interactive fiction", "branching narrative", "markdown", "story graph", "education", "BIF"],
+  "main": "./dist/extension.js",
+  "repository": { "type": "git", "url": "https://github.com/gymnasiumsteglitz/bif-authoring-tools" },
+  "homepage": "https://github.com/gymnasiumsteglitz/bif-authoring-tools#readme",
+  "bugs": { "url": "https://github.com/gymnasiumsteglitz/bif-authoring-tools/issues" },
+  "activationEvents": [
+    "workspaceContains:config.js",
+    "onLanguage:markdown",
+    "onCommand:bif.refreshDiagnostics",
+    "onCommand:bif.openStoryGraph",
+    "onCommand:bif.showStorySummary",
+    "onCommand:bif.showOutput"
+  ],
+  "contributes": {
+    "commands": [
+      { "command": "bif.refreshDiagnostics", "title": "BIF: Refresh Story Diagnostics" },
+      { "command": "bif.openStoryGraph", "title": "BIF: Open Story Graph" },
+      { "command": "bif.showStorySummary", "title": "BIF: Show Story Summary" },
+      { "command": "bif.showOutput", "title": "BIF: Show Output" }
+    ]
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "compile": "npm run check-types && node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "test:unit": "tsx --test src/test/unit/*.test.ts",
+    "test:integration": "npm run compile && node run-integration.js",
+    "test:package": "node src/test/package.test.cjs",
+    "test": "npm run check-types && npm run test:unit && npm run test:integration",
+    "package": "npm run compile && vsce package --no-dependencies && npm run test:package",
+    "prepublishOnly": "npm run test && npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.6.0",
+    "adm-zip": "^0.5.16",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

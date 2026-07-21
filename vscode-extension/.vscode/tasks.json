@@ -1,0 +1,9 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "compile", "type": "npm", "script": "compile", "problemMatcher": "$tsc" },
+    { "label": "watch", "type": "npm", "script": "watch", "isBackground": true, "problemMatcher": "$esbuild-watch" },
+    { "label": "check-types", "type": "npm", "script": "check-types", "problemMatcher": "$tsc" },
+    { "label": "test", "type": "npm", "script": "test" }
+  ]
+}

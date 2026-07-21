@@ -1,0 +1,13 @@
+src/**
+.story-tools/**
+test-fixtures/**
+.vscode/**
+node_modules/**
+*.vsix
+**/*.map
+dist/test/**
+run-integration.js
+esbuild.js
+tsconfig.json
+package-lock.json
+PUBLISHING.md
