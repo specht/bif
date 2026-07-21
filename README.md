@@ -31,6 +31,25 @@ choice and URL history, and graph rewind removes story variables from an
 abandoned route. The rewind scenario uses a small story under
 `test-fixtures/rewind-state/`.
 
+Checking a story
+----------------
+
+Run `npm run check-story` to analyze the story selected by `config.js` without
+opening a browser or executing story JavaScript, conditions, or expressions.
+The checker discovers all Markdown pages, validates internal links and
+reachability, parses embedded scripts, conditions, and expressions as
+JavaScript, and checks local image paths. It is the reusable foundation for
+future editor tooling.
+
+Use `node tools/check-story.js --project path/to/project` to check another
+project, `--json` for deterministic machine-readable output, or `--strict` to
+make warnings fail the command. JSON output uses schema version `1` and contains
+the project configuration, summary counts, diagnostics, and the parsed page and
+edge graph. The command exits nonzero when it finds an error; warnings alone
+pass unless `--strict` is used. `npm test` runs both the fast analyzer tests and
+the browser regression suite; the browser-only command is
+`npm run test:browser`.
+
 Story script helpers
 --------------------
 
