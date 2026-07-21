@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "contentHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "project": { "title": "Invalid fixture", "pagesPath": "pages", "startPage": "1" },
+  "summary": { "pages": "thirteen", "reachablePages": 1, "unreachablePages": 0, "choices": 0, "groups": 0, "missingTargets": 0, "errors": 0, "warnings": 0 },
+  "nodes": [], "edges": [], "groups": [], "diagnostics": []
+}

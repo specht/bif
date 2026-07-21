@@ -256,6 +256,7 @@ body.dev {
 
         #dev_pane {
             flex: 70;
+            order: -1;
             display: flex;
             flex-direction: column;
 
@@ -271,6 +272,64 @@ body.dev {
                 width: 600px;
                 display: flex;
 
+                #graph-panel {
+                    min-width: 0;
+                    min-height: 0;
+                    flex: 1;
+                    display: grid;
+                    grid-template-rows: auto minmax(0, 1fr);
+                    box-sizing: border-box;
+                }
+
+                #project-analysis-summary {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 0.75em;
+                    min-width: 0;
+                    padding: 0.4em 0.6em;
+                    box-sizing: border-box;
+                    border-bottom: 1px solid var(--mix-80);
+                    background: var(--mix-95);
+                    font-size: 0.82em;
+
+                    #project-analysis-status {
+                        min-width: 0;
+                        line-height: 1.4;
+                    }
+
+                    #project-analysis-counts {
+                        display: flex;
+                        align-items: baseline;
+                        flex-wrap: wrap;
+                        gap: 0.25em 0.7em;
+                    }
+
+                    #project-analysis-counts[hidden] {
+                        display: none;
+                    }
+
+                    .project-analysis-title {
+                        font-weight: 600;
+                    }
+
+                    .project-analysis-errors,
+                    .project-analysis-warnings {
+                        font-weight: 600;
+                    }
+
+                    .project-analysis-note {
+                        display: block;
+                        font-style: italic;
+                        color: var(--mix-60);
+                    }
+
+                    .project-analysis-refresh {
+                        flex: none;
+                        padding: 0.3em 0.65em;
+                    }
+                }
+
                 #divider {
                     width: 8px;
                     cursor: col-resize;
@@ -279,7 +338,8 @@ body.dev {
 
                 #graph-container {
                     box-shadow: 0.1em 0 0.1em rgba(0, 0, 0, 0.1);
-                    flex: 1;
+                    min-width: 0;
+                    min-height: 0;
                     position: relative;
                     svg {
                         position: absolute;

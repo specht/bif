@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "project": { "title": "Fixture project", "pagesPath": "pages", "startPage": "1" },
+  "summary": { "pages": 13, "reachablePages": 12, "unreachablePages": 1, "choices": 21, "groups": 3, "missingTargets": 2, "errors": 0, "warnings": 1 },
+  "nodes": [],
+  "edges": [],
+  "groups": [],
+  "diagnostics": [{ "severity": "warning", "code": "fixture-warning", "file": "pages/1.md", "line": 1, "column": 1, "message": "Fixture warning" }]
+}

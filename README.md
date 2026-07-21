@@ -25,6 +25,18 @@ Install the browser-test dependencies once with `npm install`, then run the
 regression suite with `npm test`. To watch the tests in a browser, use
 `npm run test:headed`.
 
+In development mode, the graph pane also reads the optional generated snapshot
+`.story-tools/analysis.json` and shows project page, choice, diagnostic,
+unreachable-page, and missing-target counts above the gameplay graph. The BIF
+VS Code extension generates this file after analysis. Use the summary's
+**Refresh** button, or return focus to the browser window, to reload it without
+reloading the story. Normal playback never requests the file, so static reader
+deployment remains independent of the extension and Node.js.
+
+This is only a summary of project analysis; Project graph mode is not yet
+implemented. The standalone `.story-tools/graph.html` export remains available
+separately.
+
 The initial Playwright suite checks that the configured story renders without
 page errors, navigation appends to the transcript while preserving the chosen
 choice and URL history, and graph rewind removes story variables from an
@@ -49,6 +61,33 @@ edge graph. The command exits nonzero when it finds an error; warnings alone
 pass unless `--strict` is used. `npm test` runs both the fast analyzer tests and
 the browser regression suite; the browser-only command is
 `npm run test:browser`.
+
+Publishing browser analysis
+---------------------------
+
+Run `npm run analysis` to analyze the current project and atomically publish the
+versioned, non-executable snapshot `.story-tools/analysis.json`. To publish a
+different BIF project, use:
+
+```bash
+npm run analysis -- --project /path/to/story
+```
+
+Publication succeeds even when the story contains analyzer errors or warnings;
+the command reports those counts in its output. Use `npm run check-story` when
+diagnostics should determine CI success. The browser development summary reads
+the generated JSON, and the BIF VS Code extension updates the same file on
+saved-file analysis through the same shared Node service. No browser needs to
+be open for publication.
+
+In short, the three tooling commands have distinct jobs:
+
+- `npm run check-story` validates a story for humans and CI;
+- `npm run analysis` publishes machine-readable browser analysis;
+- `npm run story-graph` exports the standalone authoring graph.
+
+Everything under `.story-tools/` is local generated output. Do not deploy it
+with the normal reader site.
 
 Standalone authoring graph
 --------------------------

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "contentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "project": { "title": "Updated fixture", "pagesPath": "pages", "startPage": "1" },
+  "summary": { "pages": 14, "reachablePages": 14, "unreachablePages": 0, "choices": 24, "groups": 4, "missingTargets": 0, "errors": 2, "warnings": 3 },
+  "nodes": [],
+  "edges": [],
+  "groups": [],
+  "diagnostics": [{ "severity": "error", "code": "fixture-error", "file": "pages/2.md", "line": 2, "column": 3, "message": "Fixture error" }]
+}
