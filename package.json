@@ -2,11 +2,16 @@
   "name": "interactive-fiction-player",
   "private": true,
   "scripts": {
-    "test": "playwright test",
-    "test:headed": "playwright test --headed"
+    "test": "npm run test:analyzer && npm run test:browser",
+    "test:analyzer": "node --test tests/analyzer",
+    "test:browser": "playwright test",
+    "test:headed": "playwright test --headed",
+    "check-story": "node tools/check-story.js"
   },
   "devDependencies": {
-    "@playwright/test": "^1.54.1"
+    "@playwright/test": "^1.54.1",
+    "acorn": "^8.17.0",
+    "markdown-it": "^14.3.0",
+    "markdown-it-attrs": "^5.0.0"
   }
 }
-
