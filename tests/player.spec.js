@@ -6,6 +6,13 @@ function collectPageErrors(page) {
   return errors;
 }
 
+async function useFixture(page, title, path) {
+  await page.route(/\/config\.js\?.*/, route => route.fulfill({
+    contentType: 'text/javascript',
+    body: `export const title = ${JSON.stringify(title)}; export const path = ${JSON.stringify(path)};`,
+  }));
+}
+
 test('initial page renders', async ({ page }) => {
   const pageErrors = collectPageErrors(page);
 
@@ -38,10 +45,7 @@ test('choosing a page appends its passage to the transcript', async ({ page }) =
 
 test('graph rewind clears variables from an abandoned route', async ({ page }) => {
   const pageErrors = collectPageErrors(page);
-  await page.route(/\/config\.js\?.*/, route => route.fulfill({
-    contentType: 'text/javascript',
-    body: 'export const title = "Rewind state fixture"; export const path = "test-fixtures/rewind-state";',
-  }));
+  await useFixture(page, 'Rewind state fixture', 'test-fixtures/rewind-state');
 
   await page.goto('/?dev');
   await page.locator('.pagelink', { hasText: 'Take route A' }).click();
@@ -55,5 +59,84 @@ test('graph rewind clears variables from an abandoned route', async ({ page }) =
 
   await expect(page.getByText('State after rewind: undefined')).toBeVisible();
   await expect(page.getByText('Function after rewind: undefined')).toBeVisible();
+  expect(pageErrors).toEqual([]);
+});
+
+test('scripted choice is usable while its script is suspended', async ({ page }) => {
+  const pageErrors = collectPageErrors(page);
+  await useFixture(page, 'Async navigation fixture', 'test-fixtures/async-navigation');
+
+  await page.goto('/?dev');
+  await expect(page.getByRole('heading', { name: 'Async navigation fixture' })).toBeVisible();
+  const selected = page.getByRole('button', { name: 'Inspect the machine' });
+  const rejected = page.getByRole('button', { name: 'Leave it alone' });
+  await expect(selected).toBeVisible();
+  await expect(rejected).toBeVisible();
+  await expect(page.getByText('Continuation resumed with inspect.')).toHaveCount(0);
+
+  await selected.click();
+
+  await expect(page.getByText('Continuation resumed with inspect.')).toBeVisible();
+  await expect(page.getByText('Continuation resumed with inspect.')).toHaveCount(1);
+  await expect(page.locator('#state-container')).toContainText('resumed_answer: inspect');
+  await expect(selected).toBeVisible();
+  await expect(selected).toHaveClass(/chosen/);
+  await expect(rejected).toHaveClass(/dismissed/);
+  expect(pageErrors).toEqual([]);
+});
+
+test('scripted choice and continuation replay without prompting again', async ({ page }) => {
+  const pageErrors = collectPageErrors(page);
+  await useFixture(page, 'Async navigation fixture', 'test-fixtures/async-navigation');
+  await page.goto('/?dev');
+  await page.getByRole('button', { name: 'Inspect the machine' }).click();
+  await expect(page.getByRole('heading', { name: 'Programmatic destination' })).toBeVisible();
+  const replayUrl = page.url();
+
+  await page.goto(replayUrl);
+
+  await expect(page.getByText('Continuation resumed with inspect.')).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: 'Programmatic destination' })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Inspect the machine' })).toHaveClass(/chosen/);
+  await expect(page.getByRole('button', { name: 'Leave it alone' })).toHaveClass(/dismissed/);
+  expect(pageErrors).toEqual([]);
+});
+
+test('goToPage performs one normal story transition', async ({ page }) => {
+  const pageErrors = collectPageErrors(page);
+  await useFixture(page, 'Async navigation fixture', 'test-fixtures/async-navigation');
+  await page.goto('/?dev');
+  const initialHash = new URL(page.url()).hash;
+
+  await page.getByRole('button', { name: 'Inspect the machine' }).click();
+
+  await expect(page.getByText('The source passage is mounted', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Inspect the machine' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Programmatic destination' })).toHaveCount(1);
+  await expect(page.getByText('The destination passage was appended exactly once.')).toHaveCount(1);
+  await expect(page.locator('#node_2')).toHaveClass(/active/);
+  await expect(page.getByRole('button', { name: 'Spiel neu starten' })).toHaveCount(1);
+  expect(new URL(page.url()).hash).not.toBe(initialHash);
+  const replayHistory = await page.evaluate(() => LZString.decompressFromEncodedURIComponent(location.hash.slice(1)).split(','));
+  expect(replayHistory.filter(pageId => pageId === '2')).toHaveLength(1);
+  expect(pageErrors).toEqual([]);
+});
+
+test('double activation cannot append a scripted destination twice', async ({ page }) => {
+  const pageErrors = collectPageErrors(page);
+  await useFixture(page, 'Async navigation fixture', 'test-fixtures/async-navigation');
+  await page.goto('/?dev');
+  const selected = page.getByRole('button', { name: 'Inspect the machine' });
+
+  await selected.evaluate(button => {
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+
+  await expect(page.getByRole('heading', { name: 'Programmatic destination' })).toHaveCount(1);
+  await expect(page.getByText('Continuation resumed with inspect.')).toHaveCount(1);
+  const replayHistory = await page.evaluate(() => LZString.decompressFromEncodedURIComponent(location.hash.slice(1)).split(','));
+  expect(replayHistory.filter(pageId => pageId === 'inspect')).toHaveLength(1);
+  expect(replayHistory.filter(pageId => pageId === '2')).toHaveLength(1);
   expect(pageErrors).toEqual([]);
 });

@@ -30,3 +30,23 @@ page errors, navigation appends to the transcript while preserving the chosen
 choice and URL history, and graph rewind removes story variables from an
 abandoned route. The rewind scenario uses a small story under
 `test-fixtures/rewind-state/`.
+
+Story script helpers
+--------------------
+
+Embedded page scripts can use these helpers:
+
+```js
+print(markdown)
+await presentChoice(options)
+await goToPage(pageId)
+```
+
+`print()` appends rendered Markdown to the transcript. `presentChoice()` returns
+a Promise that resolves with the selected option, and `goToPage()` returns a
+Promise that resolves after the destination has been appended through the same
+story transition used by normal choices. Story scripts should `await` both
+asynchronous helpers.
+
+`forceTurnToPage()` remains available as a legacy compatibility alias for
+existing stories; new story code should use `goToPage()`.
