@@ -140,3 +140,137 @@ test('double activation cannot append a scripted destination twice', async ({ pa
   expect(replayHistory.filter(pageId => pageId === '2')).toHaveLength(1);
   expect(pageErrors).toEqual([]);
 });
+
+async function openSessionFixture(page) {
+  await useFixture(page, 'Session history fixture', 'test-fixtures/session-history');
+  await page.goto('/?dev');
+  await expect(page.getByRole('heading', { name: 'Session history fixture' })).toBeVisible();
+  await expect.poll(() => new URL(page.url()).hash).not.toBe('');
+}
+
+async function chooseAndWaitForCheckpoint(page, text) {
+  const previousUrl = page.url();
+  await page.locator('.pagelink', { hasText: text }).click();
+  await expect(page).not.toHaveURL(previousUrl);
+}
+
+test('reloading the initial session preserves its seed and entry effects', async ({ page }) => {
+  const pageErrors = collectPageErrors(page);
+  await openSessionFixture(page);
+  const initialHash = new URL(page.url()).hash;
+  const seededResult = await page.getByText(/Seeded result:/).textContent();
+
+  await page.reload();
+
+  await expect(page.getByText(seededResult)).toBeVisible();
+  expect(new URL(page.url()).hash).toBe(initialHash);
+  await expect(page.getByRole('heading', { name: 'Session history fixture' })).toHaveCount(1);
+  await expect(page.getByText('Start entries: 1')).toBeVisible();
+  expect(pageErrors).toEqual([]);
+});
+
+test('browser Back restores the previous transcript, state, and graph route', async ({ page }) => {
+  const pageErrors = collectPageErrors(page);
+  await openSessionFixture(page);
+  await chooseAndWaitForCheckpoint(page, 'Enter the middle passage');
+  await expect(page.getByRole('heading', { name: 'Middle passage' })).toBeVisible();
+  const middleUrl = page.url();
+  await chooseAndWaitForCheckpoint(page, 'Take the later route');
+  await expect(page.getByRole('heading', { name: 'Later passage' })).toBeVisible();
+
+  await page.goBack();
+
+  await expect(page).toHaveURL(middleUrl);
+  await expect(page.getByRole('heading', { name: 'Later passage' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Middle passage' })).toHaveCount(1);
+  await expect(page.getByText('Dynamic state: middle')).toHaveCount(1);
+  await expect(page.locator('#state-container')).toContainText('route_state: middle');
+  await expect(page.locator('#state-container')).not.toContainText('abandoned_only');
+  await expect(page.locator('#node_2')).toHaveClass(/active/);
+  await expect(page.locator('#node_3')).not.toHaveClass(/active/);
+  expect(pageErrors).toEqual([]);
+});
+
+test('browser Forward restores the later transcript and state', async ({ page }) => {
+  const pageErrors = collectPageErrors(page);
+  await openSessionFixture(page);
+  await chooseAndWaitForCheckpoint(page, 'Enter the middle passage');
+  await chooseAndWaitForCheckpoint(page, 'Take the later route');
+  await expect(page.getByRole('heading', { name: 'Later passage' })).toBeVisible();
+  const laterUrl = page.url();
+  await page.goBack();
+  await expect(page.getByRole('heading', { name: 'Later passage' })).toHaveCount(0);
+
+  await page.goForward();
+
+  await expect(page).toHaveURL(laterUrl);
+  await expect(page.getByRole('heading', { name: 'Later passage' })).toHaveCount(1);
+  await expect(page.getByText('Dynamic state: later')).toHaveCount(1);
+  await expect(page.locator('#state-container')).toContainText('route_state: later');
+  await expect(page.locator('#node_3')).toHaveClass(/active/);
+  expect(pageErrors).toEqual([]);
+});
+
+test('scripted choice and goToPage create one stable browser checkpoint', async ({ page }) => {
+  const pageErrors = collectPageErrors(page);
+  await openSessionFixture(page);
+  await chooseAndWaitForCheckpoint(page, 'Enter the middle passage');
+  await chooseAndWaitForCheckpoint(page, 'Open the scripted console');
+  await expect(page.getByRole('button', { name: 'Activate the console' })).toBeVisible();
+  const promptUrl = page.url();
+  await page.getByRole('button', { name: 'Activate the console' }).click();
+  await expect(page).not.toHaveURL(promptUrl);
+  await expect(page.getByRole('heading', { name: 'Session destination' })).toBeVisible();
+  const finalUrl = page.url();
+
+  await page.goBack();
+  await expect(page).toHaveURL(promptUrl);
+  await expect(page.getByRole('heading', { name: 'Session destination' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Activate the console' })).toBeVisible();
+
+  await page.goForward();
+  await expect(page).toHaveURL(finalUrl);
+  await expect(page.getByRole('heading', { name: 'Session destination' })).toHaveCount(1);
+  await expect(page.getByText('Console continuation: activate')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Activate the console' })).toHaveClass(/chosen/);
+  expect(pageErrors).toEqual([]);
+});
+
+test('repeated Back and Forward cycles never duplicate restored content', async ({ page }) => {
+  const pageErrors = collectPageErrors(page);
+  await openSessionFixture(page);
+  await chooseAndWaitForCheckpoint(page, 'Enter the middle passage');
+  await chooseAndWaitForCheckpoint(page, 'Take the later route');
+  const laterUrl = page.url();
+
+  for (let cycle = 0; cycle < 2; cycle++) {
+    await page.goBack();
+    await expect(page.getByRole('heading', { name: 'Middle passage' })).toHaveCount(1);
+    await expect(page.getByRole('heading', { name: 'Later passage' })).toHaveCount(0);
+    await expect(page.getByText('Dynamic state: middle')).toHaveCount(1);
+    await page.goForward();
+    await expect(page).toHaveURL(laterUrl);
+    await expect(page.getByRole('heading', { name: 'Later passage' })).toHaveCount(1);
+    await expect(page.getByText('Dynamic state: later')).toHaveCount(1);
+  }
+  expect(pageErrors).toEqual([]);
+});
+
+test('abandoned scripted work cannot mutate a restored session', async ({ page }) => {
+  const pageErrors = collectPageErrors(page);
+  await openSessionFixture(page);
+  await chooseAndWaitForCheckpoint(page, 'Enter the middle passage');
+  const middleUrl = page.url();
+  await chooseAndWaitForCheckpoint(page, 'Open the scripted console');
+  const abandonedChoice = await page.getByRole('button', { name: 'Activate the console' }).elementHandle();
+
+  await page.goBack();
+  await expect(page).toHaveURL(middleUrl);
+  await abandonedChoice.evaluate(button => button.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+
+  await expect(page.getByText('Console continuation: activate')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Session destination' })).toHaveCount(0);
+  await expect(page.locator('#state-container')).not.toContainText('console_answer');
+  await expect(page).toHaveURL(middleUrl);
+  expect(pageErrors).toEqual([]);
+});
