@@ -2,4 +2,10 @@ node_modules/
 playwright-report/
 test-results/
 .story-tools/
-.vscode/
+/.vscode/
+.env
+.env.*
+*.vsix
+vscode-extension/dist/
+vscode-extension/node_modules/
+vscode-extension/.vscode-test/

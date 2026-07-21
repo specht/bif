@@ -8,7 +8,9 @@
     "test:browser": "playwright test",
     "test:headed": "playwright test --headed",
     "check-story": "node tools/check-story.js",
-    "story-graph": "node tools/story-graph.js"
+    "story-graph": "node tools/story-graph.js",
+    "test:extension": "npm --prefix vscode-extension test",
+    "test:all": "npm test && npm run test:extension"
   },
   "devDependencies": {
     "@hpcc-js/wasm": "^2.34.8",
