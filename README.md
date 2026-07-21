@@ -50,3 +50,14 @@ asynchronous helpers.
 
 `forceTurnToPage()` remains available as a legacy compatibility alias for
 existing stories; new story code should use `goToPage()`.
+
+Session history
+---------------
+
+The complete story session is stored in the URL using the existing compressed
+history payload. Reloading the page, or using browser Back and Forward,
+reconstructs the transcript and story state without a build step. The stored
+random seed preserves deterministic outcomes during restoration.
+
+Browser history records settled, user-visible story checkpoints rather than
+intermediate asynchronous steps. Existing story URLs remain compatible.
