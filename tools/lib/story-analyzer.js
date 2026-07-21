@@ -97,15 +97,15 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
     }
     for (const script of parsed.scripts) {
       const error = checkScript(script.source);
-      if (error) diagnostics.push(diagnostic("error", "script-syntax", file, script.line + (error.loc?.line || 1) - 1, (error.loc?.column || 0) + 1, error.message, { scriptIndex: script.index, source: script.source.trim() }));
+      if (error) diagnostics.push(diagnostic("error", "script-syntax", file, script.line + (error.line || 1) - 1, (error.column || 0) + 1, error.message, { scriptIndex: script.index, scriptLine: error.line, scriptColumn: error.column, source: script.source.trim() }));
     }
     for (const condition of parsed.conditions) {
       const error = checkExpression(condition.source);
-      if (error) diagnostics.push(diagnostic("error", "condition-syntax", file, condition.line + Math.max((error.loc?.line || 1) - 1, 0), (error.loc?.column || 0) + 1, `Invalid condition '${condition.source}': ${error.message}`, { source: condition.source }));
+      if (error) diagnostics.push(diagnostic("error", "condition-syntax", file, condition.line + Math.max((error.line || 1) - 1, 0), (error.column || 0) + 1, `Invalid condition '${condition.source}': ${error.message}`, { expressionLine: error.line, expressionColumn: error.column, source: condition.source }));
     }
     for (const expression of parsed.expressions) {
       const error = checkExpression(expression.source);
-      if (error) diagnostics.push(diagnostic("error", "expression-syntax", file, expression.line + Math.max((error.loc?.line || 1) - 1, 0), (error.loc?.column || 0) + 1, `Invalid expression '${expression.source}': ${error.message}`, { source: expression.source }));
+      if (error) diagnostics.push(diagnostic("error", "expression-syntax", file, expression.line + Math.max((error.line || 1) - 1, 0), (error.column || 0) + 1, `Invalid expression '${expression.source}': ${error.message}`, { expressionLine: error.line, expressionColumn: error.column, source: expression.source }));
     }
     for (const image of parsed.images) {
       if (/^(?:data:|https?:|\/\/)/i.test(image.src)) continue;

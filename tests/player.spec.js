@@ -195,6 +195,12 @@ test('goToPage performs one normal story transition', async ({ page }) => {
   const restart = page.getByRole('button', { name: 'Spiel neu starten' });
   await expect(restart).toHaveCount(1);
   expect(await restart.evaluate(element => element.parentElement.classList.contains('development-toolbar-actions'))).toBe(true);
+  const restartAlignment = await restart.evaluate(element => {
+    const icon = element.querySelector('.icon').getBoundingClientRect();
+    const label = element.querySelector('span').getBoundingClientRect();
+    return { difference: Math.abs((icon.top + icon.bottom) / 2 - (label.top + label.bottom) / 2), display: getComputedStyle(element).display, html: element.innerHTML };
+  });
+  expect(restartAlignment.difference, JSON.stringify(restartAlignment)).toBeLessThanOrEqual(2);
   const overlap = await page.evaluate(() => {
     const restart = document.querySelector('#bu_reset_game').getBoundingClientRect();
     const inspector = document.querySelector('#development-inspector').getBoundingClientRect();

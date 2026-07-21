@@ -657,6 +657,23 @@ test('source snippet model handles tabs and hostile source without injection', a
   expect(await page.evaluate(() => globalThis.injected)).toBeUndefined();
 });
 
+test('source snippets trim only blank outer context while preserving source lines', async ({ page }) => {
+  await page.goto('/?mode=game');
+  const models = await page.evaluate(async () => {
+    const { buildSourceSnippet } = await import(`/lib/browser-source-snippet.js?trim=${Date.now()}`);
+    return {
+      context: buildSourceSnippet('\nalpha\n\nbad\n\nomega\n', { line: 4, column: 1 }, 3),
+      blankDiagnostic: buildSourceSnippet('alpha\n\n   \n\nomega', { line: 3 }, 2),
+      first: buildSourceSnippet('bad\n\n\n', { line: 1 }, 2),
+      last: buildSourceSnippet('\n\nbad', { line: 3 }, 2),
+    };
+  });
+  expect(models.context).toMatchObject({ startLine: 2, endLine: 6, diagnosticLine: 4, lines: ['alpha', '', 'bad', '', 'omega'] });
+  expect(models.blankDiagnostic.lines).toEqual(['alpha', '', '   ', '', 'omega']);
+  expect(models.first).toMatchObject({ startLine: 1, endLine: 1, lines: ['bad'] });
+  expect(models.last).toMatchObject({ startLine: 3, endLine: 3, lines: ['bad'] });
+});
+
 test('summary is keyboard accessible and reduced-motion safe', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await useStoryFixture(page);

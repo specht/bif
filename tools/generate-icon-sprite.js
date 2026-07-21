@@ -2,7 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ICONS = ['alert-triangle', 'brand-visual-studio', 'check', 'chevron-down', 'chevron-up', 'refresh', 'x'];
+const ICONS = ['alert-triangle', 'brand-vscode', 'check', 'chevron-down', 'chevron-up', 'refresh', 'x'];
 const root = path.resolve(__dirname, '..');
 const sourceRoot = path.join(root, 'node_modules', '@tabler', 'icons', 'icons', 'outline');
 const output = path.join(root, 'assets', 'icons.svg');

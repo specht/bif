@@ -116,6 +116,22 @@ test('summary hides zero metrics and Problems group, sort, and wrap by file', as
   await expect(page.locator('.problem-severity').first()).toContainText(/Error|Warning/);
 });
 
+test('Problems formats semantic diagnostics with page-level lines', async ({ page }) => {
+  const diagnostic = { ...complete.diagnostics[0], file: 'pages/1.md', line: 16, column: 21, message: 'Unexpected token' };
+  const unlocated = { severity: 'warning', code: 'project-note', file: '', message: 'Meaningful (context)' };
+  const publication = { ...complete, contentHash: 'd'.repeat(64), diagnostics: [diagnostic, unlocated] };
+  await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => publication);
+  await page.goto('/?dev');
+  const row = page.locator('.project-problem', { hasText: 'Unexpected token' });
+  await expect(row).toContainText('Unexpected token (line 16)');
+  await expect(row).not.toContainText('(2:20)');
+  await expect(row).not.toContainText('pages/1.md');
+  await expect(row).toHaveAttribute('title', 'pages/1.md, line 16, column 21: Unexpected token');
+  await expect(page.locator('.problem-file-group', { hasText: 'pages/1.md' })).toContainText('pages/1.md');
+  await expect(page.locator('.project-problem', { hasText: 'Meaningful (context)' })).not.toContainText('(line undefined)');
+  await expect(page.locator('.problem-location')).toHaveCount(0);
+});
+
 test('problem source is immediate, cached per file, marked, highlighted, and safely rendered', async ({ page }) => {
   await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => complete);
   let sourceRequests = 0;
@@ -140,11 +156,74 @@ test('problem source is immediate, cached per file, marked, highlighted, and saf
   expect(new Set(typography).size).toBe(1);
   await row.click();
   expect(sourceRequests).toBe(1);
-  const openSource = row.locator('xpath=following-sibling::*[contains(@class,"problem-details")]').locator('.problem-open-source');
+  const openSource = row.locator('xpath=..').locator('.problem-open-source');
   await expect(openSource).toHaveAttribute('href', /vscode:\/\/gymnasiumsteglitz\.bif-authoring-tools\/open-source\?file=pages%2F1\.md/);
-  await expect(openSource).toHaveAttribute('title', 'Requires BIF Authoring Tools in VS Code');
+  await expect(openSource).toHaveAttribute('title', 'Open in VS Code');
   await expect(row).not.toHaveAttribute('href');
   await expect(page.getByRole('button', { name: 'Copy location' })).toHaveCount(0);
+});
+
+test('Problems heading and labeled VS Code action never collide', async ({ page }) => {
+  await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => complete);
+  await page.goto('/?dev');
+  const item = page.locator('.problem-file-rows > li').first();
+  const action = item.locator('.problem-open-source');
+  await expect(action).toContainText('VS Code');
+  await expect(action.locator('svg.icon use')).toHaveAttribute('href', '/assets/icons.svg#icon-brand-vscode');
+  await expect(action).toHaveAttribute('aria-label', /Open pages\/1\.md at line \d+ in VS Code/);
+  await expect(action).toHaveAttribute('title', 'Open in VS Code');
+
+  for (const width of [1280, 760]) {
+    await page.setViewportSize({ width, height: 720 });
+    const geometry = await item.evaluate(element => {
+      const rectangle = selector => element.querySelector(selector).getBoundingClientRect().toJSON();
+      const overlaps = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+      const message = rectangle('.problem-message');
+      const severity = rectangle('.problem-severity');
+      const action = rectangle('.problem-open-source');
+      const panel = document.querySelector('#project-problems');
+      return { messageAction: overlaps(message, action), severityAction: overlaps(severity, action), overflow: panel.scrollWidth > panel.clientWidth };
+    });
+    expect(geometry).toEqual({ messageAction: false, severityAction: false, overflow: false });
+  }
+
+  const before = await snapshot(page);
+  await action.evaluate(element => element.addEventListener('click', event => event.preventDefault(), { once: true }));
+  await action.click();
+  await expect(item.locator('.project-problem')).not.toHaveClass(/selected/);
+  const after = await snapshot(page);
+  expect({ ...after, focus: before.focus }).toEqual(before);
+});
+
+test('shared icons align with labels and clean text remains neutral', async ({ page }) => {
+  await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => complete);
+  await page.goto('/?dev');
+  await expect(page.locator('.project-analysis-errors')).toBeVisible();
+  await expect(page.locator('.problem-open-source').first()).toBeVisible();
+  const aligned = await page.evaluate(() => {
+    const selectors = ['.project-analysis-errors', '.problem-severity', '.problem-open-source'];
+    return selectors.map(selector => {
+      const pair = document.querySelector(selector);
+      const icon = pair.querySelector('.icon').getBoundingClientRect();
+      const label = pair.querySelector('.icon-label').getBoundingClientRect();
+      return { selector, difference: Math.abs((icon.top + icon.bottom) / 2 - (label.top + label.bottom) / 2), ariaHidden: pair.querySelector('.icon').getAttribute('aria-hidden') };
+    });
+  });
+  expect(aligned.every(item => item.difference <= 2 && item.ariaHidden === 'true')).toBe(true);
+
+  const clean = { ...complete, contentHash: 'e'.repeat(64), summary: { ...complete.summary, errors: 0, warnings: 0, unreachablePages: 0, missingTargets: 0 }, diagnostics: [] };
+  await page.route(/\/\.story-tools\/analysis\.json\?v=\d+$/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(clean) }));
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.locator('.project-analysis-clean')).toBeVisible();
+  const colors = await page.evaluate(() => ({
+    wrapper: getComputedStyle(document.querySelector('.project-analysis-clean')).color,
+    icon: getComputedStyle(document.querySelector('.project-analysis-clean .icon')).color,
+    text: getComputedStyle(document.querySelector('.project-analysis-clean .icon-label')).color,
+    normal: getComputedStyle(document.querySelector('.project-analysis-pages')).color,
+  }));
+  expect(colors.text).toBe(colors.normal);
+  expect(colors.wrapper).toBe(colors.normal);
+  expect(colors.icon).not.toBe(colors.normal);
 });
 
 test('docked Problems and State inspector preserves graph and story behavior', async ({ page }) => {

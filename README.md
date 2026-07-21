@@ -36,17 +36,20 @@ changing the story session.
 
 The compact summary always shows the story-derived title, page count, and choice
 count, while omitting zero-valued problem metrics; a clean project is marked
-with a green Tabler check icon and `No problems`. Problems are grouped by relative source file and
+with a green Tabler check icon while the words `No problems` retain the normal
+summary color. Problems are grouped by relative source file and
 sorted by source position. Their messages and locations wrap within the panel.
 Each problem immediately shows a compact highlighted source excerpt with line
-numbers and a translucent range marker; each source file is fetched only once
+numbers and a translucent range marker. Empty outer context lines are trimmed
+without removing internal blank lines or changing source line numbers. Each source file is fetched only once
 per analysis hash, and only unusually long source lines scroll horizontally.
-The file path appears once in its group header, while rows show compact
-line/column locations. The inspector opens and closes with a short transition,
+The file path appears once in its group header. Located messages use the
+page-level form `(line N)` instead of embedded-parser coordinates. The inspector opens and closes with a short transition,
 disabled when reduced motion is requested, and its horizontal separator can be
 dragged or adjusted with Arrow keys (Shift uses larger steps). In development
 mode the restart control lives in the top toolbar instead of covering the
-inspector. The single compact VS Code action remains; Copy location was removed.
+inspector. The explicit icon-and-text **VS Code** action remains; Copy location
+was removed. Shared icon-and-text controls use consistent center alignment.
 
 Each problem offers **Open in VS Code**, which requires the BIF Authoring Tools
 extension. Source links contain only the

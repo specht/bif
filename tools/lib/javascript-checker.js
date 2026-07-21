@@ -1,5 +1,16 @@
 const acorn = require("acorn");
 
+function normalizeAcornError(error) {
+  const line = error.loc?.line;
+  const column = error.loc?.column;
+  const suffix = Number.isInteger(line) && Number.isInteger(column) ? ` (${line}:${column})` : "";
+  return {
+    message: suffix && error.message.endsWith(suffix) ? error.message.slice(0, -suffix.length) : error.message,
+    line,
+    column,
+  };
+}
+
 function checkScript(source) {
   try {
     acorn.parse(source, {
@@ -11,7 +22,7 @@ function checkScript(source) {
     });
     return null;
   } catch (error) {
-    return error;
+    return normalizeAcornError(error);
   }
 }
 
@@ -25,8 +36,8 @@ function checkExpression(source) {
     if (program.body.length !== 1) throw new SyntaxError("Expected one expression");
     return null;
   } catch (error) {
-    return error;
+    return normalizeAcornError(error);
   }
 }
 
-module.exports = { checkExpression, checkScript };
+module.exports = { checkExpression, checkScript, normalizeAcornError };

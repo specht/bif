@@ -3,6 +3,7 @@ const { spawnSync } = require("node:child_process");
 const path = require("node:path");
 const { test } = require("node:test");
 const { analyzeStory } = require("../../tools/lib/story-analyzer");
+const { normalizeAcornError } = require("../../tools/lib/javascript-checker");
 
 const repository = path.resolve(__dirname, "../..");
 const fixture = (name) => path.join(repository, "test-fixtures/analyzer", name);
@@ -42,14 +43,27 @@ test("real JavaScript parsing reports scripts, conditions, and expressions indep
   assert.ok(codes.includes("script-syntax"));
   assert.equal(codes.filter((code) => code === "script-syntax").length, 1);
   const script = result.diagnostics.find((item) => item.code === "script-syntax");
-  assert.doesNotMatch(script.message, /^Script \d+:/);
+  assert.equal(script.message, "Unexpected token");
   assert.equal(script.scriptIndex, 1);
+  assert.equal(script.scriptLine, 2);
+  assert.ok(Number.isInteger(script.scriptColumn));
+  assert.ok(Number.isInteger(script.line));
+  assert.ok(Number.isInteger(script.column));
   assert.ok(codes.includes("condition-syntax"));
   assert.equal(codes.filter((code) => code === "expression-syntax").length, 2);
   for (const item of result.diagnostics) {
     assert.equal(item.file, "pages/1.md");
     assert.ok(item.line > 0);
   }
+});
+
+test("Acorn normalization removes only its own parser-location suffix", () => {
+  assert.deepEqual(normalizeAcornError({ message: "Unexpected token (2:20)", loc: { line: 2, column: 20 } }), {
+    message: "Unexpected token", line: 2, column: 20,
+  });
+  assert.deepEqual(normalizeAcornError({ message: "Expected token (because grouped)", loc: { line: 2, column: 20 } }), {
+    message: "Expected token (because grouped)", line: 2, column: 20,
+  });
 });
 
 test("local image existence, traversal, and missing alt text are checked", async () => {

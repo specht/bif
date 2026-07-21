@@ -39,7 +39,7 @@ nav {
 
 body {
     background-color: var(--bg-color);
-    color: var(--fg-color);
+    color: inherit;
     margin: 0;
     font-family: "IBM Plex Sans", sans-serif;
     font-optical-sizing: auto;
@@ -170,11 +170,18 @@ button.pagelink {
 }
 
 .icon {
-    display: inline-block;
+    display: block;
     width: 1em;
     height: 1em;
+    flex: 0 0 auto;
     color: var(--fg-color);
     background-size: contain;
+}
+
+.icon-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
 }
 
 button {
@@ -198,17 +205,7 @@ button {
 
     white-space: nowrap;
 
-    .icon {
-        color: var(--my-button-foreground);
-        position: relative;
-        top: 0.15em;
-    }
-    :first-child.icon {
-        margin-right: 0.5em;
-    }
-    :last-child.icon {
-        margin-left: 0.5em;
-    }
+    .icon { color: inherit; }
 }
 
 nav, #dev_pane {
@@ -325,7 +322,8 @@ body.dev {
 
                     .project-analysis-errors, .severity-error { color: #b42318; }
                     .project-analysis-warnings, .severity-warning { color: #8a5a00; }
-                    .severity-success { color: #18794e; font-weight: 600; }
+                    .severity-success { font-weight: 600; }
+                    .severity-success .icon { color: #18794e; }
 
                     .project-analysis-note {
                         display: block;
@@ -346,6 +344,10 @@ body.dev {
                     }
 
                     .story-restart {
+                        display: inline-flex;
+                        align-items: center;
+                        width: auto;
+                        margin: 0;
                         padding: 0.3em 0.55em;
                         font-size: 0.95em;
                     }
@@ -449,10 +451,22 @@ body.dev {
                     }
                     .problem-file-name, .problem-file-counts { overflow-wrap: anywhere; }
 
+                    .problem-row-heading {
+                        min-width: 0;
+                        display: grid;
+                        grid-template-columns: minmax(0, 1fr) auto;
+                        align-items: start;
+                        gap: 0.25em 0.45em;
+                    }
                     .problem-details { min-width: 0; padding: 0 0.5em 0.4em 2.1em; }
-                    .problem-actions { display: flex; justify-content: flex-end; margin: -1.9em 0.2em 0.15em 0; }
-                    .problem-open-source { font-size: 0.78em; }
-                    .problem-open-source { text-decoration: underline; }
+                    .problem-open-source {
+                        flex: none;
+                        margin: 0.35em 0.5em 0 0;
+                        font-size: 0.78em;
+                        white-space: nowrap;
+                        text-decoration: none;
+                    }
+                    .problem-open-source:hover { text-decoration: underline; }
                     .problem-source-host, .problem-source-note, .problem-source-snippet,
                     .problem-source-snippet code, .problem-source-snippet span {
                         font: 0.78rem/1.35 'IBM Plex Mono', monospace;
@@ -498,20 +512,11 @@ body.dev {
                         white-space: normal;
                         overflow-wrap: anywhere;
                         display: grid;
-                        grid-template-columns: auto minmax(0, 1fr) auto;
+                        grid-template-columns: auto minmax(0, 1fr);
                         gap: 0.15em 0.55em;
 
                         .problem-severity { display: inline-flex; align-items: center; gap: 0.2em; font-weight: 600; }
                         .problem-message { min-width: 0; }
-                        .problem-location {
-                            grid-column: 3;
-                            min-width: 0;
-                            color: var(--mix-50);
-                            font-family: 'IBM Plex Mono', monospace;
-                            font-size: 0.88em;
-                            overflow-wrap: anywhere;
-                        }
-
                         &:hover, &:focus-visible, &.selected { background: var(--mix-85); }
                     }
                 }
