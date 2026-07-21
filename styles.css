@@ -21,9 +21,15 @@
   --mix-95: color-mix(in hsl, var(--bg-color) 95%, var(--fg-color));
 }
 
-html, body {
+html {
     margin: 0;
-    height: 100vh;
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    margin: 0;
+    height: 100%;
     overflow: auto;
 }
 
@@ -54,6 +60,23 @@ body {
 
 a {
     text-decoration: none;
+}
+
+a:focus-visible, button:focus-visible, .story-passage:focus-visible {
+    outline: 3px solid var(--fg-color);
+    outline-offset: 3px;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 img {
@@ -203,6 +226,8 @@ nav, #dev_pane {
 }
 
 body.dev {
+    overflow: hidden;
+
     nav {
         position: absolute;
         left: 0;
@@ -225,6 +250,8 @@ body.dev {
             min-width: 200px;
             padding: 0.5em;
             height: 100%;
+            box-sizing: border-box;
+            overflow-y: auto;
         }
 
         #dev_pane {
@@ -343,6 +370,17 @@ body.skip-animations {
     * {
         transition: none !important;
         animation: none !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    *, *::before, *::after {
+        transition-duration: 0s !important;
+        animation-duration: 0s !important;
     }
 }
 

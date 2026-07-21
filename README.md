@@ -74,3 +74,15 @@ same reporting path.
 The browser console contains the structured error object and full developer
 details. Outside development mode, readers see only a restrained story-error
 message rather than an internal stack trace.
+
+Keyboard interaction
+--------------------
+
+Ordinary story choices remain links: use Tab to focus them and Enter to follow
+them. Temporary choices created by `presentChoice()` remain buttons and support
+both Space and Enter. After keyboard navigation, focus moves to the newly
+appended passage; mouse and touch navigation retain the existing scrolling and
+focus behavior.
+
+Keyboard focus is visibly indicated, rejected choices leave the tab order, and
+the player respects the system reduced-motion preference.

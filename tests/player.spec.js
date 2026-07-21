@@ -386,3 +386,140 @@ test('valid scripts, conditions, expressions, and navigation remain unaffected',
   await expect(page.getByRole('heading', { name: 'Valid destination' })).toHaveCount(1);
   expect(pageErrors).toEqual([]);
 });
+
+async function openKeyboardFixture(page) {
+  await useFixture(page, 'Keyboard accessibility fixture', 'test-fixtures/keyboard-accessibility');
+  await page.goto('/?dev');
+  await expect(page.getByRole('heading', { name: 'Keyboard fixture start' })).toBeVisible();
+}
+
+test('ordinary choices are keyboard-focusable semantic links', async ({ page }) => {
+  const pageErrors = collectPageErrors(page);
+  await openKeyboardFixture(page);
+
+  await page.keyboard.press('Tab');
+  const focused = page.locator(':focus');
+  await expect(focused).toHaveText('Take the primary route');
+  await expect(focused).toHaveJSProperty('tagName', 'A');
+  await expect(focused).toHaveAttribute('href', /2/);
+  const focusStyle = await focused.evaluate(element => getComputedStyle(element).outlineStyle);
+  expect(focusStyle).not.toBe('none');
+  await page.keyboard.press('Enter');
+
+  await expect(page.getByRole('heading', { name: 'Keyboard destination' })).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: 'Keyboard fixture start' })).toHaveCount(1);
+  expect(pageErrors).toEqual([]);
+});
+
+test('rejected ordinary choices leave the tab order', async ({ page }) => {
+  await openKeyboardFixture(page);
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Keyboard destination' })).toBeVisible();
+
+  const rejected = page.getByText('Take the rejected route');
+  await expect(rejected).toHaveAttribute('tabindex', '-1');
+  await expect(rejected).toHaveAttribute('aria-disabled', 'true');
+  await page.keyboard.press('Tab');
+  await expect(page.locator(':focus')).toHaveText('Open the scripted interaction');
+  await rejected.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Rejected route A' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Keyboard destination' })).toHaveCount(1);
+});
+
+test('keyboard navigation focuses the newly appended passage', async ({ page }) => {
+  await openKeyboardFixture(page);
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Enter');
+
+  const destination = page.locator('.story-passage[data-page-id="2"]');
+  await expect(destination).toBeFocused();
+  await expect(destination).toHaveAttribute('tabindex', '-1');
+  await page.keyboard.press('Tab');
+  await expect(page.locator(':focus')).toHaveText('Open the scripted interaction');
+});
+
+test('pointer activation does not force focus to the new passage', async ({ page }) => {
+  await openKeyboardFixture(page);
+  const choice = page.getByText('Take the primary route');
+  await choice.click();
+
+  const destination = page.locator('.story-passage[data-page-id="2"]');
+  await expect(destination).toBeVisible();
+  await expect(destination).not.toBeFocused();
+  await expect(choice).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Keyboard destination' })).toHaveCount(1);
+});
+
+test('development layout has only the transcript scrollbar', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 500 });
+  await openKeyboardFixture(page);
+  await page.getByText('Take the primary route').click();
+
+  const layout = await page.evaluate(() => ({
+    htmlClientHeight: document.documentElement.clientHeight,
+    htmlScrollHeight: document.documentElement.scrollHeight,
+    bodyClientHeight: document.body.clientHeight,
+    bodyScrollHeight: document.body.scrollHeight,
+    gameOverflowY: getComputedStyle(document.querySelector('#game_pane')).overflowY,
+  }));
+  expect(layout.htmlScrollHeight).toBe(layout.htmlClientHeight);
+  expect(layout.bodyScrollHeight).toBe(layout.bodyClientHeight);
+  expect(layout.gameOverflowY).toBe('auto');
+});
+
+test('scripted choices retain native button keyboard behavior', async ({ page }) => {
+  const pageErrors = collectPageErrors(page);
+  await openKeyboardFixture(page);
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Keyboard destination' })).toBeVisible();
+  await expect(page.locator('.story-passage[data-page-id="2"]')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Scripted choice passage' })).toBeVisible();
+  await expect(page.locator('.story-passage[data-page-id="3"]')).toBeFocused();
+  await page.keyboard.press('Tab');
+
+  const selected = page.getByRole('button', { name: 'Accept the temporary choice' });
+  const rejected = page.getByRole('button', { name: 'Reject the temporary choice' });
+  await expect(selected).toBeFocused();
+  await expect(rejected).toHaveJSProperty('tagName', 'BUTTON');
+  await page.keyboard.press('Space');
+
+  await expect(page.getByText('Keyboard continuation: accept')).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: 'Keyboard programmatic destination' })).toHaveCount(1);
+  await expect(rejected).toBeDisabled();
+  const replayHistory = await page.evaluate(() => LZString.decompressFromEncodedURIComponent(location.hash.slice(1)).split(','));
+  expect(replayHistory.filter(token => token === 'accept')).toHaveLength(1);
+  expect(replayHistory.filter(token => token === '6')).toHaveLength(1);
+  expect(pageErrors).toEqual([]);
+});
+
+test('the polite status announces only the stable current passage', async ({ page }) => {
+  await openKeyboardFixture(page);
+  const status = page.locator('#story-status');
+  await expect(status).toHaveAttribute('aria-live', 'polite');
+  await page.getByText('Take the primary route').click();
+  await expect(status).toHaveText('New passage: Keyboard destination');
+  expect((await status.textContent()).length).toBeLessThan(80);
+  const destinationUrl = page.url();
+  await page.getByText('Open the scripted interaction').click();
+  await expect(status).toHaveText('New passage: Scripted choice passage');
+  await page.goBack();
+  await expect(page).toHaveURL(destinationUrl);
+  await expect(status).toHaveText('Current passage: Keyboard destination');
+});
+
+test('reduced motion disables story transitions and smooth scrolling', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openKeyboardFixture(page);
+  const rejected = page.getByText('Take the rejected route');
+  const transitionDuration = await rejected.evaluate(element => getComputedStyle(element).transitionDuration);
+  expect(transitionDuration.split(',').every(duration => duration.trim() === '0s')).toBe(true);
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior)).toBe('auto');
+
+  await page.getByText('Take the primary route').click();
+  await expect(rejected).toHaveClass(/dismissed/);
+  await expect(page.getByRole('heading', { name: 'Keyboard destination' })).toHaveCount(1);
+});
