@@ -50,6 +50,29 @@ pass unless `--strict` is used. `npm test` runs both the fast analyzer tests and
 the browser regression suite; the browser-only command is
 `npm run test:browser`.
 
+Standalone authoring graph
+--------------------------
+
+Run `npm run story-graph` to generate `.story-tools/graph.html`. The generated
+file is a self-contained offline authoring graph, separate from the graph used
+while playing. It includes every discovered page, unreachable pages, explicit
+missing-target nodes, parallel choices, metadata groups, and analyzer
+diagnostics.
+
+The graph supports search, status and group filters, pan and zoom controls, and
+details for pages and individual choices. Source locations can be copied or
+opened through `vscode://` links. A custom project and output file can be used
+with:
+
+```bash
+node tools/story-graph.js \
+  --project /path/to/story \
+  --output /path/to/graph.html
+```
+
+The file is still generated when story errors are present, but the command
+exits with status `1`. Warnings alone pass unless `--strict` is supplied.
+
 Story script helpers
 --------------------
 
