@@ -41,7 +41,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<BifExt
     }),
     vscode.commands.registerCommand("bif.showStorySummary", async () => {
       const project = await manager.chooseProject(); if (!project?.result) return;
-      void vscode.window.showInformationMessage(`${project.folder.name}: ${summaryText(project.result.summary)} · Graph: .story-tools/graph.html`);
+      void vscode.window.showInformationMessage(`${project.result.project.title}: ${summaryText(project.result.summary)} · Graph: .story-tools/graph.html`);
     }),
     vscode.commands.registerCommand("bif.showOutput", () => output.show()),
     vscode.window.onDidChangeActiveTextEditor(() => manager.updateStatus()),

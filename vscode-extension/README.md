@@ -21,7 +21,10 @@ deployed with the normal reader site.
 Commands are available as **BIF: Refresh Story Diagnostics**, **BIF: Open Story
 Graph**, **BIF: Show Story Summary**, and **BIF: Show Output**.
 
-The extension recognizes `config.js` at each workspace-folder root. It analyzes
+The extension recognizes mandatory `config.js` at each workspace-folder root.
+Its `path` export selects the story directory, whose fixed start page is `1.md`;
+the displayed story title comes from `1.md` front matter or its first H1, not
+from config. It analyzes
 saved filesystem content only, never executes story scripts, and never changes
 stories. Background analysis updates `.story-tools/analysis.json`. Standalone
 graph export remains a separate, explicit command that writes

@@ -20,7 +20,7 @@ async function readProjectConfig(projectRoot) {
     for (const item of declaration.declarations) {
       if (
         item.id.type === "Identifier" &&
-        ["title", "path"].includes(item.id.name) &&
+        ["title", "path", "startPage"].includes(item.id.name) &&
         item.init?.type === "Literal" &&
         typeof item.init.value === "string"
       ) {
@@ -34,7 +34,13 @@ async function readProjectConfig(projectRoot) {
     error.loc = { line: 1, column: 0 };
     throw error;
   }
-  return { title: values.title || "", pagesPath: values.path };
+  return {
+    pagesPath: values.path,
+    migrationWarnings: [
+      values.title && "config.js title is ignored; add title metadata or an H1 to the selected story's 1.md.",
+      values.startPage && "config.js startPage is ignored; stories always begin at 1.md.",
+    ].filter(Boolean),
+  };
 }
 
 module.exports = { readProjectConfig };

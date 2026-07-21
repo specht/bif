@@ -9,6 +9,7 @@ const fixture = (name) => path.join(repository, "test-fixtures/analyzer", name);
 
 test("valid story produces a stable graph with distinct repeated edges", async () => {
   const result = await analyzeStory(fixture("valid"));
+  assert.equal(result.project.title, "Analyzer start");
   assert.equal(result.summary.errors, 0);
   assert.equal(result.summary.pages, 2);
   assert.equal(result.summary.links, 2);
@@ -40,6 +41,9 @@ test("real JavaScript parsing reports scripts, conditions, and expressions indep
   const codes = result.diagnostics.map((item) => item.code);
   assert.ok(codes.includes("script-syntax"));
   assert.equal(codes.filter((code) => code === "script-syntax").length, 1);
+  const script = result.diagnostics.find((item) => item.code === "script-syntax");
+  assert.doesNotMatch(script.message, /^Script \d+:/);
+  assert.equal(script.scriptIndex, 1);
   assert.ok(codes.includes("condition-syntax"));
   assert.equal(codes.filter((code) => code === "expression-syntax").length, 2);
   for (const item of result.diagnostics) {

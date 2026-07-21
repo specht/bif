@@ -11,7 +11,7 @@ function collectPageErrors(page) {
 async function useFixture(page, title, path) {
   await page.route(/\/config\.js\?.*/, route => route.fulfill({
     contentType: 'text/javascript',
-    body: `export const title = ${JSON.stringify(title)}; export const path = ${JSON.stringify(path)};`,
+    body: `export const path = ${JSON.stringify(path)};`,
   }));
 }
 
@@ -61,10 +61,20 @@ test('initial page renders', async ({ page }) => {
   await page.goto('/');
 
   await expect(page).toHaveTitle('Die List des Odysseus');
+  await expect(page.locator('#content')).not.toContainText('title: Die List des Odysseus');
   await expect(page.getByText('Du bist Odysseus', { exact: false })).toBeVisible();
   await expect(page.getByText('Du gehst mit', { exact: false })).toBeVisible();
   await expect(page.locator('.pagelink')).not.toHaveCount(0);
   expect(pageErrors).toEqual([]);
+});
+
+test('game mode derives the title from the first H1 without analysis', async ({ page }) => {
+  const analysisRequests = [];
+  page.on('request', request => { if (request.url().includes('analysis.json')) analysisRequests.push(request.url()); });
+  await useFixture(page, 'ignored config title', 'test-fixtures/rewind-state');
+  await page.goto('/?mode=game');
+  await expect(page).toHaveTitle('Rewind state fixture');
+  expect(analysisRequests).toEqual([]);
 });
 
 test('choosing a page appends its passage to the transcript', async ({ page }) => {

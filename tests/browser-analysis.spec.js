@@ -11,7 +11,7 @@ async function fixture(name) {
 async function useStoryFixture(page) {
   await page.route(/\/config\.js\?.*/, route => route.fulfill({
     contentType: 'text/javascript',
-    body: "export const title = 'Analysis fixture'; export const path = 'test-fixtures/rewind-state';",
+    body: "export const path = 'test-fixtures/rewind-state';",
   }));
 }
 
@@ -77,6 +77,31 @@ async function expectPlayerUsable(page) {
   await page.locator('.pagelink', { hasText: 'Take route A' }).click();
   await expect(page.getByText('Route A set abandoned to true.')).toBeVisible();
 }
+
+test('browser icon helper uses the allowlisted currentColor sprite safely', async ({ page }) => {
+  await page.goto('/?mode=game');
+  const result = await page.evaluate(async () => {
+    const { createIcon } = await import('/lib/browser-icons.js');
+    const icon = createIcon('check');
+    document.body.append(icon);
+    let error = '';
+    try {
+      createIcon('not-allowlisted');
+    } catch (caught) {
+      error = caught.message;
+    }
+    return {
+      ariaHidden: icon.getAttribute('aria-hidden'),
+      href: icon.querySelector('use')?.getAttribute('href'),
+      error,
+    };
+  });
+  expect(result).toEqual({
+    ariaHidden: 'true',
+    href: '/assets/icons.svg#icon-check',
+    error: 'Unknown browser icon: not-allowlisted',
+  });
+});
 
 test('background polling recovers from the Live Server publication race', async ({ page }) => {
   await useStoryFixture(page);
@@ -618,14 +643,14 @@ test('source snippet model handles tabs and hostile source without injection', a
     document.body.append(rendered);
     return {
       column: model.diagnosticColumn,
-      marker: rendered.querySelector('.problem-source-marker').textContent,
+      markerClass: rendered.querySelector('.problem-source-range').className,
       images: rendered.querySelectorAll('img').length,
       scripts: rendered.querySelectorAll('script').length,
       text: rendered.textContent,
     };
   });
   expect(result.column).toBe(5);
-  expect(result.marker).toContain('^');
+  expect(result.markerClass).toContain('exact');
   expect(result.images).toBe(0);
   expect(result.scripts).toBe(0);
   expect(result.text).toContain('</script><img');
@@ -643,6 +668,8 @@ test('summary is keyboard accessible and reduced-motion safe', async ({ page }) 
   await page.getByRole('link', { name: 'Take route B' }).focus();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Spiel neu starten' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('separator', { name: 'Resize development inspector' })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(stateTab).toBeFocused();
   await expect(page.locator('#project-analysis-status')).toHaveAttribute('aria-live', 'polite');

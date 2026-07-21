@@ -118,14 +118,14 @@ The files are TTF rather than WOFF2, so they can later be made smaller, but the 
 
 # 3. Current configuration model
 
-`config.js` exports only:
+`config.js` exports only the story directory:
 
 ```js
-export const title = "Die List des Odysseus";
 export const path = "pages";
 ```
 
-This selects one page directory and sets the document title.
+This selects one page directory. The title comes from front matter or the first
+H1 in that directory's mandatory `1.md` entry page.
 
 The three story collections are therefore alternate projects inside one repository:
 

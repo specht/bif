@@ -11,12 +11,14 @@
     "check-story": "node tools/check-story.js",
     "analysis": "node tools/publish-analysis.js",
     "story-graph": "node tools/story-graph.js",
+    "generate-icons": "node tools/generate-icon-sprite.js",
     "test:extension": "npm --prefix vscode-extension test",
     "test:all": "npm test && npm run test:extension"
   },
   "devDependencies": {
     "@hpcc-js/wasm": "^2.34.8",
     "@playwright/test": "^1.54.1",
+    "@tabler/icons": "3.34.1",
     "acorn": "^8.17.0",
     "chokidar": "^4.0.3",
     "markdown-it": "^14.3.0",

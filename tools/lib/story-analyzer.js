@@ -3,6 +3,7 @@ const path = require("node:path");
 const { readProjectConfig } = require("./project-config");
 const { parsePage } = require("./page-parser");
 const { checkExpression, checkScript } = require("./javascript-checker");
+const { resolveStoryMetadata, FALLBACK_TITLE } = require("../../lib/story-metadata");
 
 const collator = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
 const severityOrder = { error: 0, warning: 1, info: 2 };
@@ -27,13 +28,15 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
     config = await readProjectConfig(root);
   } catch (error) {
     diagnostics.push(diagnostic("error", "config-error", "config.js", error.loc?.line || 1, (error.loc?.column || 0) + 1, error.message));
-    return finish(root, { title: "", pagesPath: "", startPage: "1" }, [], [], diagnostics);
+    return finish(root, { title: FALLBACK_TITLE, pagesPath: "", startPage: "1" }, [], [], diagnostics);
   }
 
   const pagesDirectory = path.resolve(root, config.pagesPath);
+  for (const message of config.migrationWarnings || []) diagnostics.push(diagnostic("warning", "config-migration", "config.js", 1, 1, message));
+  let storyTitle = FALLBACK_TITLE;
   if (!pagesDirectory.startsWith(`${root}${path.sep}`) && pagesDirectory !== root) {
     diagnostics.push(diagnostic("error", "pages-path-outside-project", "config.js", 1, 1, `Configured story path escapes the project: ${config.pagesPath}`));
-    return finish(root, { ...config, startPage: "1" }, [], [], diagnostics);
+    return finish(root, { ...config, title: FALLBACK_TITLE, startPage: "1" }, [], [], diagnostics);
   }
 
   let files;
@@ -44,7 +47,7 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
       .sort(collator.compare);
   } catch (error) {
     diagnostics.push(diagnostic("error", "pages-path-missing", relative(root, pagesDirectory), 1, 1, `Cannot read configured story directory: ${error.message}`));
-    return finish(root, { ...config, startPage: "1" }, [], [], diagnostics);
+    return finish(root, { ...config, title: FALLBACK_TITLE, startPage: "1" }, [], [], diagnostics);
   }
 
   const pages = [];
@@ -65,6 +68,12 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
       diagnostics.push(diagnostic("error", "file-read-error", file, 1, 1, `Cannot read page: ${error.message}`));
       pages.push({ id, filename, file, group: "", graphLabel: "", links: [], scripts: [], conditions: [], expressions: [], images: [] });
       continue;
+    }
+    if (id === "1") {
+      const metadata = resolveStoryMetadata(source, { sourcePath: file });
+      storyTitle = metadata.title;
+      source = metadata.bodyMarkdown;
+      for (const message of metadata.warnings) diagnostics.push(diagnostic("warning", "missing-story-title", file, 1, 1, message));
     }
     const parsed = parsePage(source);
     if (parsed.metadata.malformed) diagnostics.push(diagnostic("warning", "malformed-metadata", file, parsed.metadata.line, 1, "Graph metadata comment is malformed."));
@@ -88,7 +97,7 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
     }
     for (const script of parsed.scripts) {
       const error = checkScript(script.source);
-      if (error) diagnostics.push(diagnostic("error", "script-syntax", file, script.line + (error.loc?.line || 1) - 1, (error.loc?.column || 0) + 1, `Script ${script.index}: ${error.message}`, { source: script.source.trim() }));
+      if (error) diagnostics.push(diagnostic("error", "script-syntax", file, script.line + (error.loc?.line || 1) - 1, (error.loc?.column || 0) + 1, error.message, { scriptIndex: script.index, source: script.source.trim() }));
     }
     for (const condition of parsed.conditions) {
       const error = checkExpression(condition.source);
@@ -138,7 +147,7 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
     if (!reachable.has(page.id)) diagnostics.push(diagnostic("warning", "unreachable-page", page.file, 1, 1, `Page '${page.id}' is unreachable from page '${startPage}'.`));
   }
 
-  return finish(root, { ...config, startPage }, pages, edges, diagnostics, reachable.size);
+  return finish(root, { ...config, title: storyTitle, startPage }, pages, edges, diagnostics, reachable.size);
 }
 
 function relative(root, value) {

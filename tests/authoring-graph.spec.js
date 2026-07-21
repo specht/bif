@@ -31,7 +31,7 @@ async function openGraph(page) {
 
 test('standalone authoring graph renders every real and missing node offline', async ({ page }) => {
   const captured = await openGraph(page);
-  await expect(page.getByRole('heading', { name: /Complete graph fixture/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Start of the authoring map/ })).toBeVisible();
   await expect(page.locator('.authoring-node.page')).toHaveCount(3);
   await expect(page.locator('.authoring-node.unreachable')).toHaveCount(2);
   await expect(page.locator('.authoring-node.missing')).toHaveCount(1);
@@ -132,6 +132,6 @@ test('hostile embedded text cannot break graph data or inject markup', async ({ 
   await expect(page.locator('#canvas svg')).toBeVisible();
   await expect(page.locator('#injected')).toHaveCount(0);
   const title = await page.locator('#graph-data').evaluate(element => JSON.parse(element.textContent).project.title);
-  expect(title).toContain('Äneas');
+  expect(title).toBe('Escaping');
   expect(errors).toEqual([]);
 });

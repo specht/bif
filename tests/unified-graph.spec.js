@@ -18,7 +18,7 @@ test.beforeAll(async () => {
 async function configure(page, fixturePath, publicationProvider) {
   await page.route(/\/config\.js\?.*/, route => route.fulfill({
     contentType: 'text/javascript',
-    body: `export const title = 'Unified graph fixture'; export const path = ${JSON.stringify(fixturePath)};`,
+    body: `export const path = ${JSON.stringify(fixturePath)};`,
   }));
   await page.route(/\/\.story-tools\/analysis\.json\?v=\d+$/, route => route.fulfill({
     contentType: 'application/json', body: JSON.stringify(publicationProvider()),
@@ -79,7 +79,7 @@ test('one graph shows complete structure and contextual Problems', async ({ page
   await expect(page.locator('#project-problems')).toBeVisible();
   await expect(page.locator('.project-problem.selected')).toContainText('missing page');
   await expect(page.locator('.project-problem')).toHaveCount(complete.diagnostics.length);
-  await expect(page.locator('#project-problems')).toContainText('pages/1.md:');
+  await expect(page.locator('.problem-file-name').filter({ hasText: 'pages/1.md' })).toHaveCount(1);
   await expect(page.locator('#project-problems')).not.toContainText(process.cwd());
   const before = await snapshot(page);
   await page.locator('.project-problem', { hasText: 'missing page' }).click();
@@ -100,8 +100,8 @@ test('summary hides zero metrics and Problems group, sort, and wrap by file', as
   await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => publication);
   await page.goto('/?dev');
   const summary = page.locator('#project-analysis-counts');
-  await expect(summary).toContainText('Complete graph fixture');
-  await expect(summary).toContainText('✓ No problems');
+  await expect(summary).toContainText('Start of the authoring map');
+  await expect(summary).toContainText('No problems');
   for (const metric of ['errors', 'warnings', 'unreachable', 'missing']) await expect(page.locator(`.project-analysis-${metric}`)).toBeHidden();
 
   publication = complete;
@@ -113,10 +113,10 @@ test('summary hides zero metrics and Problems group, sort, and wrap by file', as
   expect(locations.every(location => !location.includes(process.cwd()))).toBe(true);
   const overflow = await page.locator('#project-problems').evaluate(element => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }));
   expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
-  await expect(page.locator('.problem-severity').first()).toContainText(/✕ Error|⚠ Warning/);
+  await expect(page.locator('.problem-severity').first()).toContainText(/Error|Warning/);
 });
 
-test('problem source is lazy, cached, marked, highlighted, and safely rendered', async ({ page }) => {
+test('problem source is immediate, cached per file, marked, highlighted, and safely rendered', async ({ page }) => {
   await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => complete);
   let sourceRequests = 0;
   await page.route(/\/pages\/1\.md$/, async route => {
@@ -125,24 +125,26 @@ test('problem source is lazy, cached, marked, highlighted, and safely rendered',
   });
   await page.goto('/?dev');
   const row = page.locator('.project-problem', { hasText: 'missing page' }).first();
-  const before = sourceRequests;
-  await expect(page.locator('.problem-source-snippet')).toHaveCount(0);
-  await row.click();
-  await expect(page.locator('.problem-source-snippet')).toBeVisible();
-  expect(sourceRequests).toBe(before + 1);
+  await expect(page.locator('.problem-source-snippet').first()).toBeVisible();
+  expect(sourceRequests).toBe(1);
   await expect(page.locator('.problem-source-line-number')).not.toHaveCount(0);
-  await expect(page.locator('.problem-source-marker')).toContainText('^');
+  await expect(page.locator('.problem-source-range')).not.toHaveCount(0);
   await expect(page.locator('.token-link')).not.toHaveCount(0);
+  const typography = await page.locator('.problem-source-snippet').first().evaluate(element => {
+    const selectors = ['.problem-source-line-number', '.problem-source-text', '.problem-source-range', '.token-link'];
+    return selectors.map(selector => {
+      const style = getComputedStyle(element.querySelector(selector));
+      return `${style.fontSize}/${style.lineHeight}`;
+    });
+  });
+  expect(new Set(typography).size).toBe(1);
   await row.click();
-  await row.click();
-  expect(sourceRequests).toBe(before + 1);
+  expect(sourceRequests).toBe(1);
   const openSource = row.locator('xpath=following-sibling::*[contains(@class,"problem-details")]').locator('.problem-open-source');
   await expect(openSource).toHaveAttribute('href', /vscode:\/\/gymnasiumsteglitz\.bif-authoring-tools\/open-source\?file=pages%2F1\.md/);
   await expect(openSource).toHaveAttribute('title', 'Requires BIF Authoring Tools in VS Code');
   await expect(row).not.toHaveAttribute('href');
-  await page.evaluate(() => { navigator.clipboard.writeText = async value => { document.body.dataset.copiedLocation = value; }; });
-  await row.locator('xpath=following-sibling::*[contains(@class,"problem-details")]').getByRole('button', { name: 'Copy location' }).click();
-  await expect(page.locator('body')).toHaveAttribute('data-copied-location', /pages\/1\.md:\d+:\d+/);
+  await expect(page.getByRole('button', { name: 'Copy location' })).toHaveCount(0);
 });
 
 test('docked Problems and State inspector preserves graph and story behavior', async ({ page }) => {
@@ -180,6 +182,39 @@ test('docked Problems and State inspector preserves graph and story behavior', a
   }));
   expect(viewport.bottom).toBeLessThanOrEqual(viewport.viewport);
   expect(viewport.htmlOverflow).toBe('hidden');
+});
+
+test('resizable inspector and development UI state survive reload without rebuilding story state', async ({ page }) => {
+  await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => complete);
+  await page.goto('/?dev');
+  const inspector = page.locator('#development-inspector');
+  const separator = page.getByRole('separator', { name: 'Resize development inspector' });
+  const svg = page.locator('#graph-container svg');
+  const beforeHeight = await inspector.evaluate(element => element.getBoundingClientRect().height);
+  const handleBox = await separator.boundingBox();
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y - 20);
+  await page.mouse.up();
+  await expect.poll(() => inspector.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThan(beforeHeight);
+  await separator.focus();
+  await page.keyboard.press('Shift+ArrowUp');
+  await expect.poll(() => inspector.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThan(beforeHeight);
+  const resizedHeight = Number(await separator.getAttribute('aria-valuenow'));
+  await expect.poll(() => inspector.evaluate((element, expected) => Math.abs(element.getBoundingClientRect().height - expected), resizedHeight)).toBeLessThan(7);
+  await page.getByRole('tab', { name: 'State' }).click();
+  const originalViewBox = await svg.getAttribute('viewBox');
+  await svg.dispatchEvent('wheel', { deltaY: -100, clientX: 300, clientY: 200 });
+  await expect.poll(() => svg.getAttribute('viewBox')).not.toBe(originalViewBox);
+  const savedViewBox = await svg.getAttribute('viewBox');
+  await page.reload();
+  await expect(page.getByRole('tab', { name: 'State' })).toHaveAttribute('aria-selected', 'true');
+  await expect.poll(() => inspector.evaluate((element, expected) => Math.abs(element.getBoundingClientRect().height - expected), resizedHeight)).toBeLessThan(7);
+  await expect(page.locator('#graph-container svg')).toHaveAttribute('viewBox', savedViewBox);
+  await expect(page.locator('#graph-container svg')).toHaveCount(1);
+  const storage = await page.evaluate(() => Object.values(sessionStorage).join('\n'));
+  expect(storage).not.toContain(process.cwd());
+  expect(storage).not.toContain('crew_count');
 });
 
 test('parallel runtime choices map to distinct analysis edge identities', async ({ page }) => {

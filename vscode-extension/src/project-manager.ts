@@ -80,7 +80,7 @@ export class ProjectManager implements vscode.Disposable {
       for (const [, [uri, diagnostics]] of grouped) this.diagnostics.set(uri, diagnostics);
       project.diagnosticUris = nextUris;
       project.result = result; project.state = "idle"; project.lastError = undefined;
-      this.output.appendLine(`${project.folder.name}: ${summaryText(result.summary)} · analysis ${published.contentHash.slice(0, 12)}`);
+      this.output.appendLine(`${result.project.title}: ${summaryText(result.summary)} · analysis ${published.contentHash.slice(0, 12)}`);
     } catch (error) {
       const code = typeof error === "object" && error && "code" in error ? String(error.code) : undefined;
       project.state = stateAfterAnalysisFailure(Boolean(project.result), code);
@@ -104,7 +104,7 @@ export class ProjectManager implements vscode.Disposable {
     this.status.show();
     if (project.state === "analysing") { this.status.text = "$(sync~spin) BIF analysing…"; return; }
     if (project.state === "error") { this.status.text = "$(error) BIF extension error"; this.status.tooltip = "BIF analysis failed. Show output for details."; return; }
-    if (project.result) { this.status.text = statusText(project.result.summary, this.projects.length > 1 ? project.folder.name : ""); this.status.tooltip = `${project.folder.name}\n${summaryText(project.result.summary)}`; }
+    if (project.result) { this.status.text = statusText(project.result.summary, project.result.project.title); this.status.tooltip = `${project.result.project.title}\n${summaryText(project.result.summary)}`; }
   }
   owns(project: ManagedProject, uri: vscode.Uri): boolean { return ownsFile(project.root, project.result?.project?.pagesPath || "pages", uri.fsPath); }
   dispose(): void { for (const project of this.projects) { project.scheduler.dispose(); project.watchers.forEach(item => item.dispose()); for (const uri of project.diagnosticUris) this.diagnostics.delete(vscode.Uri.parse(uri)); } this.disposables.forEach(item => item.dispose()); }
