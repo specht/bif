@@ -182,7 +182,15 @@ test('goToPage performs one normal story transition', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Programmatic destination' })).toHaveCount(1);
   await expect(page.getByText('The destination passage was appended exactly once.')).toHaveCount(1);
   await expect(page.locator('#node_2')).toHaveClass(/active/);
-  await expect(page.getByRole('button', { name: 'Spiel neu starten' })).toHaveCount(1);
+  const restart = page.getByRole('button', { name: 'Spiel neu starten' });
+  await expect(restart).toHaveCount(1);
+  expect(await restart.evaluate(element => element.parentElement.classList.contains('development-toolbar-actions'))).toBe(true);
+  const overlap = await page.evaluate(() => {
+    const restart = document.querySelector('#bu_reset_game').getBoundingClientRect();
+    const inspector = document.querySelector('#development-inspector').getBoundingClientRect();
+    return restart.bottom > inspector.top && restart.top < inspector.bottom;
+  });
+  expect(overlap).toBe(false);
   expect(new URL(page.url()).hash).not.toBe(initialHash);
   const replayHistory = await page.evaluate(() => LZString.decompressFromEncodedURIComponent(location.hash.slice(1)).split(','));
   expect(replayHistory.filter(pageId => pageId === '2')).toHaveLength(1);

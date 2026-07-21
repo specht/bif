@@ -89,6 +89,62 @@ test('one graph shows complete structure and contextual Problems', async ({ page
   expect(after.focus).toContain('missing page');
 });
 
+test('summary hides zero metrics and Problems group, sort, and wrap by file', async ({ page }) => {
+  const clean = {
+    ...complete,
+    contentHash: 'c'.repeat(64),
+    summary: { ...complete.summary, errors: 0, warnings: 0, unreachablePages: 0, missingTargets: 0 },
+    diagnostics: [],
+  };
+  let publication = clean;
+  await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => publication);
+  await page.goto('/?dev');
+  const summary = page.locator('#project-analysis-counts');
+  await expect(summary).toContainText('Complete graph fixture');
+  await expect(summary).toContainText('✓ No problems');
+  for (const metric of ['errors', 'warnings', 'unreachable', 'missing']) await expect(page.locator(`.project-analysis-${metric}`)).toBeHidden();
+
+  publication = complete;
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.getByRole('tab', { name: `Problems (${complete.diagnostics.length})` })).toBeVisible();
+  const files = await page.locator('.problem-file-name').allTextContents();
+  expect(files).toEqual([...files].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })));
+  const locations = await page.locator('.problem-location').allTextContents();
+  expect(locations.every(location => !location.includes(process.cwd()))).toBe(true);
+  const overflow = await page.locator('#project-problems').evaluate(element => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }));
+  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
+  await expect(page.locator('.problem-severity').first()).toContainText(/✕ Error|⚠ Warning/);
+});
+
+test('problem source is lazy, cached, marked, highlighted, and safely rendered', async ({ page }) => {
+  await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => complete);
+  let sourceRequests = 0;
+  await page.route(/\/pages\/1\.md$/, async route => {
+    sourceRequests += 1;
+    await route.fulfill({ contentType: 'text/markdown', body: await (await import('node:fs/promises')).readFile(path.join(completeRoot, 'pages/1.md'), 'utf8') });
+  });
+  await page.goto('/?dev');
+  const row = page.locator('.project-problem', { hasText: 'missing page' }).first();
+  const before = sourceRequests;
+  await expect(page.locator('.problem-source-snippet')).toHaveCount(0);
+  await row.click();
+  await expect(page.locator('.problem-source-snippet')).toBeVisible();
+  expect(sourceRequests).toBe(before + 1);
+  await expect(page.locator('.problem-source-line-number')).not.toHaveCount(0);
+  await expect(page.locator('.problem-source-marker')).toContainText('^');
+  await expect(page.locator('.token-link')).not.toHaveCount(0);
+  await row.click();
+  await row.click();
+  expect(sourceRequests).toBe(before + 1);
+  const openSource = row.locator('xpath=following-sibling::*[contains(@class,"problem-details")]').locator('.problem-open-source');
+  await expect(openSource).toHaveAttribute('href', /vscode:\/\/gymnasiumsteglitz\.bif-authoring-tools\/open-source\?file=pages%2F1\.md/);
+  await expect(openSource).toHaveAttribute('title', 'Requires BIF Authoring Tools in VS Code');
+  await expect(row).not.toHaveAttribute('href');
+  await page.evaluate(() => { navigator.clipboard.writeText = async value => { document.body.dataset.copiedLocation = value; }; });
+  await row.locator('xpath=following-sibling::*[contains(@class,"problem-details")]').getByRole('button', { name: 'Copy location' }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-copied-location', /pages\/1\.md:\d+:\d+/);
+});
+
 test('docked Problems and State inspector preserves graph and story behavior', async ({ page }) => {
   await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => complete);
   await page.goto('/?dev');
@@ -115,8 +171,7 @@ test('docked Problems and State inspector preserves graph and story behavior', a
   const openHeight = await page.locator('#graph-container').evaluate(element => element.getBoundingClientRect().height);
   await page.getByRole('button', { name: 'Collapse' }).click();
   await expect(inspector).toHaveClass(/collapsed/);
-  const collapsedHeight = await page.locator('#graph-container').evaluate(element => element.getBoundingClientRect().height);
-  expect(collapsedHeight).toBeGreaterThan(openHeight);
+  await expect.poll(() => page.locator('#graph-container').evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThan(openHeight);
   await expect(page.locator('#development-state')).toBeHidden();
   const viewport = await page.locator('#dev_fixed').evaluate(element => ({
     bottom: element.getBoundingClientRect().bottom,
@@ -142,6 +197,26 @@ test('parallel runtime choices map to distinct analysis edge identities', async 
   await expect(page.getByText('Take the guarded road')).toHaveClass(/chosen/);
   await expect(page.locator(`#${guarded.edgeId}`)).toHaveClass(/active/);
   await expect(page.locator(`#${edges.find(edge => edge !== guarded).edgeId}`)).not.toHaveClass(/active/);
+});
+
+test('graph navigation preserves pointer and keyboard focus modality', async ({ page }) => {
+  await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => complete);
+  await page.goto('/?dev');
+  await page.locator('#node_2').click();
+  await expect(page.getByRole('heading', { name: 'The high pass' })).toBeVisible();
+  expect(await page.locator('.story-passage[data-page-id="2"]').evaluate(element => ({
+    focused: document.activeElement === element,
+    outline: getComputedStyle(element).outlineStyle,
+  }))).toEqual({ focused: false, outline: 'none' });
+
+  await page.locator('#node_1').click();
+  await expect(page.locator('.story-passage')).toHaveCount(1);
+  await page.locator('#node_2').focus();
+  await page.keyboard.press('Enter');
+  const passage = page.locator('.story-passage[data-page-id="2"]');
+  await expect(passage).toBeFocused();
+  expect(await passage.evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');
+  await expect(page.getByRole('heading', { name: 'The high pass' })).toHaveCount(1);
 });
 
 test('conditional structure is visible but unavailable graph edges cannot navigate', async ({ page }) => {

@@ -608,6 +608,30 @@ test('hostile publication text is rendered as inert text', async ({ page }) => {
   await expect(page.locator('#project-analysis-summary')).toContainText('1 page');
 });
 
+test('source snippet model handles tabs and hostile source without injection', async ({ page }) => {
+  await page.goto('/?mode=game');
+  const result = await page.evaluate(async () => {
+    const module = await import(`/lib/browser-source-snippet.js?test=${Date.now()}`);
+    const source = '\tconst value = "</script><img src=x onerror=globalThis.injected=true>";';
+    const model = module.buildSourceSnippet(source, { line: 1, column: 2, endColumn: 7 });
+    const rendered = module.renderSourceSnippet(model, 'pages/1.md');
+    document.body.append(rendered);
+    return {
+      column: model.diagnosticColumn,
+      marker: rendered.querySelector('.problem-source-marker').textContent,
+      images: rendered.querySelectorAll('img').length,
+      scripts: rendered.querySelectorAll('script').length,
+      text: rendered.textContent,
+    };
+  });
+  expect(result.column).toBe(5);
+  expect(result.marker).toContain('^');
+  expect(result.images).toBe(0);
+  expect(result.scripts).toBe(0);
+  expect(result.text).toContain('</script><img');
+  expect(await page.evaluate(() => globalThis.injected)).toBeUndefined();
+});
+
 test('summary is keyboard accessible and reduced-motion safe', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await useStoryFixture(page);
@@ -617,6 +641,8 @@ test('summary is keyboard accessible and reduced-motion safe', async ({ page }) 
   const stateTab = page.getByRole('tab', { name: 'State' });
   await expect(stateTab).toBeVisible();
   await page.getByRole('link', { name: 'Take route B' }).focus();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Spiel neu starten' })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(stateTab).toBeFocused();
   await expect(page.locator('#project-analysis-status')).toHaveAttribute('aria-live', 'polite');

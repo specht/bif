@@ -34,6 +34,24 @@ Summary counters and a docked, collapsible **Problems (N) | State** inspector
 expose analyzer diagnostics and runtime state without covering the graph or
 changing the story session.
 
+The compact summary always shows the project title, page count, and choice
+count, while omitting zero-valued problem metrics; a clean project is marked
+with a green `✓ No problems`. Problems are grouped by relative source file and
+sorted by source position. Their messages and locations wrap within the panel.
+Expanding a problem lazily loads a highlighted source excerpt with line numbers
+and a location marker; only unusually long source lines scroll horizontally.
+The inspector opens and closes with a short transition, disabled when reduced
+motion is requested. In development mode the restart control lives in the top
+toolbar instead of covering the inspector.
+
+An expanded problem offers **Open in VS Code**, which requires the BIF
+Authoring Tools extension, and **Copy location**. Source links contain only the
+relative file and one-based line and column—never an absolute project path. If
+the editor link is unavailable, use the copied location with `Ctrl+P` to open
+the relative file and `Ctrl+G` to jump to its line. Pointer graph navigation
+does not move focus to a passage or show its keyboard-only outline; keyboard
+graph and transcript navigation retain a visible passage focus indicator.
+
 The BIF VS Code extension generates the snapshot after analysis. Without the
 extension, run `npm run analysis -- --watch` while editing. After loading or
 returning to a visible tab, the browser makes bounded quick checks (250, 250,

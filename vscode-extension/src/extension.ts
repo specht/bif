@@ -2,12 +2,14 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { ProjectManager, ManagedProject } from "./project-manager";
 import { summaryText } from "./core";
+import { createSourceUriHandler, vscodeSourceUriDependencies } from "./source-uri-handler";
 
 const { generateAuthoringGraph } = require("../../tools/story-graph") as { generateAuthoringGraph(options: { project: string; output: string }): Promise<any> };
 
 export interface BifExtensionApi {
   manager: ProjectManager;
   generateGraph(project: ManagedProject, open?: boolean): Promise<string>;
+  openSource(uri: vscode.Uri): Promise<void>;
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<BifExtensionApi> {
@@ -17,6 +19,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<BifExt
   status.command = "bif.showStorySummary";
   const manager = new ProjectManager(diagnostics, status, output);
   context.subscriptions.push(output, diagnostics, status, manager);
+  const sourceUriHandler = createSourceUriHandler(vscodeSourceUriDependencies(manager));
+  context.subscriptions.push(vscode.window.registerUriHandler(sourceUriHandler));
 
   const generateGraph = async (project: ManagedProject, open = true): Promise<string> => {
     if (!vscode.workspace.isTrusted) throw new Error("Trust this workspace before generating or opening the BIF authoring graph.");
@@ -44,7 +48,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<BifExt
     vscode.workspace.onDidSaveTextDocument(document => { const project = manager.projects.find(item => manager.owns(item, document.uri)); if (project) project.scheduler.schedule(); }),
   );
   await manager.discover();
-  return { manager, generateGraph };
+  return { manager, generateGraph, openSource: async uri => { await sourceUriHandler.handleUri(uri); } };
 }
 
 export function deactivate(): void {}

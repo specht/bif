@@ -297,6 +297,7 @@ body.dev {
                     #project-analysis-status {
                         min-width: 0;
                         line-height: 1.4;
+                        overflow-wrap: anywhere;
                     }
 
                     #project-analysis-counts {
@@ -319,6 +320,10 @@ body.dev {
                         font-weight: 600;
                     }
 
+                    .project-analysis-errors, .severity-error { color: #b42318; }
+                    .project-analysis-warnings, .severity-warning { color: #8a5a00; }
+                    .severity-success { color: #18794e; font-weight: 600; }
+
                     .project-analysis-note {
                         display: block;
                         font-style: italic;
@@ -328,6 +333,18 @@ body.dev {
                     .project-analysis-retry {
                         flex: none;
                         padding: 0.3em 0.65em;
+                    }
+
+                    .development-toolbar-actions {
+                        flex: none;
+                        display: flex;
+                        align-items: center;
+                        gap: 0.4em;
+                    }
+
+                    .story-restart {
+                        padding: 0.3em 0.55em;
+                        font-size: 0.95em;
                     }
 
                 }
@@ -355,9 +372,11 @@ body.dev {
                     border-top: 1px solid var(--mix-80);
                     background: var(--mix-95);
                     box-sizing: border-box;
+                    overflow: hidden;
+                    transition: height 200ms ease;
 
                     &.collapsed {
-                        height: auto;
+                        height: 2.65em;
                         grid-template-rows: auto;
                     }
 
@@ -394,12 +413,63 @@ body.dev {
                 }
 
                 #project-problems {
+                    min-width: 0;
+                    overflow-x: hidden;
 
                     .project-problems-list {
                         list-style: none;
                         margin: 0;
                         padding: 0.35em;
+                        min-width: 0;
                     }
+
+                    .problem-file-group, .problem-file-rows { min-width: 0; }
+                    .problem-file-rows { list-style: none; margin: 0; padding: 0; }
+                    .problem-file-header {
+                        min-width: 0;
+                        display: flex;
+                        flex-wrap: wrap;
+                        justify-content: space-between;
+                        gap: 0.25em 0.75em;
+                        padding: 0.45em 0.5em 0.25em;
+                        border-bottom: 1px solid var(--mix-80);
+                        font-weight: 600;
+                    }
+                    .problem-file-name, .problem-file-counts { overflow-wrap: anywhere; }
+
+                    .problem-details { min-width: 0; padding: 0 0.5em 0.55em 2.5em; }
+                    .problem-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4em; margin: 0.35em 0; }
+                    .problem-open-source, .problem-copy-location { font-size: 0.84em; }
+                    .problem-open-source { text-decoration: underline; }
+                    .problem-copy-location { padding: 0.25em 0.45em; }
+                    .problem-source-host { min-width: 0; overflow: hidden; }
+                    .problem-source-note { margin: 0.35em 0; font-size: 0.88em; }
+                    .problem-source-snippet {
+                        min-width: 0;
+                        max-height: 13em;
+                        overflow-x: auto;
+                        overflow-y: auto;
+                        border: 1px solid var(--mix-80);
+                        border-radius: 0.25em;
+                        background: var(--bg-color);
+                    }
+                    .problem-source-code { width: max-content; min-width: 100%; padding: 0.35em 0; }
+                    .problem-source-line {
+                        display: grid;
+                        grid-template-columns: 3.5em auto;
+                        min-height: 1.35em;
+                        font-family: 'IBM Plex Mono', monospace;
+                        font-size: 0.84em;
+                        white-space: pre;
+                    }
+                    .problem-source-line-number { padding-right: 0.75em; text-align: right; color: var(--mix-50); user-select: none; }
+                    .problem-source-text, .problem-source-marker code { padding-right: 0.75em; }
+                    .problem-source-marker { color: #b42318; font-weight: 700; }
+                    .token-heading, .token-keyword { color: #8250df; font-weight: 600; }
+                    .token-link, .token-string { color: #0a7c42; }
+                    .token-code, .token-number { color: #9a3b00; }
+                    .token-emphasis { font-style: italic; }
+                    .token-comment { color: var(--mix-50); font-style: italic; }
 
                     .project-problem {
                         width: 100%;
@@ -408,6 +478,23 @@ body.dev {
                         background: transparent;
                         text-align: left;
                         font: inherit;
+                        min-width: 0;
+                        white-space: normal;
+                        overflow-wrap: anywhere;
+                        display: grid;
+                        grid-template-columns: auto minmax(0, 1fr);
+                        gap: 0.15em 0.55em;
+
+                        .problem-severity { font-weight: 600; }
+                        .problem-message { min-width: 0; }
+                        .problem-location {
+                            grid-column: 2;
+                            min-width: 0;
+                            color: var(--mix-50);
+                            font-family: 'IBM Plex Mono', monospace;
+                            font-size: 0.88em;
+                            overflow-wrap: anywhere;
+                        }
 
                         &:hover, &:focus-visible, &.selected { background: var(--mix-85); }
                     }

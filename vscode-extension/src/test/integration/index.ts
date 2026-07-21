@@ -27,6 +27,13 @@ export async function run(): Promise<void> {
   for (const code of ["missing-page", "unreachable-page", "expression-syntax", "missing-image"]) assert.ok(codes.includes(code), `missing diagnostic ${code}`);
   assert.ok(allDiagnostics().some(item => item.severity === vscode.DiagnosticSeverity.Error && item.source === "BIF"));
   const root = project.root;
+  await api.openSource(vscode.Uri.parse("vscode://gymnasiumsteglitz.bif-authoring-tools/open-source?file=pages%2F1.md&line=2&column=3"));
+  assert.equal(vscode.window.activeTextEditor?.document.uri.fsPath, path.join(root, "pages", "1.md"));
+  assert.equal(vscode.window.activeTextEditor?.selection.active.line, 1);
+  assert.equal(vscode.window.activeTextEditor?.selection.active.character, 2);
+  const openedSource = vscode.window.activeTextEditor?.document.uri.fsPath;
+  await api.openSource(vscode.Uri.parse("vscode://gymnasiumsteglitz.bif-authoring-tools/open-source?file=..%2Fsecret&line=1&column=1"));
+  assert.equal(vscode.window.activeTextEditor?.document.uri.fsPath, openedSource, "malicious source URI must not escape the workspace");
   const analysisPath = path.join(root, ".story-tools", "analysis.json");
   await waitFor(() => exists(analysisPath));
   const initialPublication = JSON.parse(await fs.readFile(analysisPath, "utf8"));
