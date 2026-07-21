@@ -1,5 +1,4 @@
 const crypto = require("node:crypto");
-const fs = require("node:fs/promises");
 const path = require("node:path");
 const { buildAuthoringGraph } = require("./authoring-graph-model");
 
@@ -125,36 +124,9 @@ function safeString(value) {
     .replace(/\u2029/g, "\\u2029");
 }
 
-async function publishBrowserAnalysis(projectRoot, publication, generation, options = {}) {
-  const fileSystem = options.fileSystem || fs;
-  const isCurrent = options.isCurrent || (() => true);
-  const directory = path.join(projectRoot, ".story-tools");
-  const output = path.join(directory, "analysis.json");
-  const temporary = path.join(directory, `.analysis.${process.pid}.${generation}.tmp`);
-  await fileSystem.mkdir(directory, { recursive: true });
-  let handle;
-  try {
-    handle = await fileSystem.open(temporary, "wx");
-    await handle.writeFile(canonicalJson(publication), "utf8");
-    await handle.sync();
-    await handle.close();
-    handle = undefined;
-    if (!isCurrent(generation)) return { output, published: false };
-    if (options.beforeRename) await options.beforeRename({ temporary, output });
-    await fileSystem.rename(temporary, output);
-    return { output, published: true };
-  } finally {
-    if (handle) await handle.close().catch(() => {});
-    await fileSystem.unlink(temporary).catch(error => {
-      if (error?.code !== "ENOENT") throw error;
-    });
-  }
-}
-
 module.exports = {
   buildBrowserAnalysisPublication,
   canonicalJson,
-  publishBrowserAnalysis,
   sanitizeDiagnostic,
   validateBrowserAnalysisPublication,
 };

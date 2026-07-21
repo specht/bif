@@ -13,10 +13,10 @@ Features:
 
 After each latest saved-file analysis, the extension writes
 `.story-tools/analysis.json`. This Git-ignored, versioned JSON file is a
-deterministic, non-executable snapshot for a future browser Project mode. It
-contains relative source locations only, is generated even when no browser is
-open, and should not be deployed with the normal reader site. The browser does
-not consume it yet.
+deterministic, non-executable snapshot used by the browser development summary
+and intended for a future browser Project mode. It contains relative source
+locations only, is generated even when no browser is open, and should not be
+deployed with the normal reader site.
 
 Commands are available as **BIF: Refresh Story Diagnostics**, **BIF: Open Story
 Graph**, **BIF: Show Story Summary**, and **BIF: Show Output**.
@@ -26,6 +26,13 @@ saved filesystem content only, never executes story scripts, and never changes
 stories. Background analysis updates `.story-tools/analysis.json`. Standalone
 graph export remains a separate, explicit command that writes
 `.story-tools/graph.html`; it is disabled in untrusted workspaces.
+
+The extension is the VS Code adapter over the repository's shared Node
+analysis/publication service. That shared service owns analyzer invocation,
+publication construction, canonical hashing, and atomic file replacement. The
+extension continues to own workspace discovery, watchers, generation
+scheduling, Problems diagnostics, status and output, commands, and editor UI;
+it does not spawn npm or parse CLI output.
 
 ## Development
 

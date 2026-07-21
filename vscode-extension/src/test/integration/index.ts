@@ -3,6 +3,10 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
+const { publishProjectAnalysis } = require("../../../../tools/lib/publish-project-analysis") as {
+  publishProjectAnalysis(root: string): Promise<any>;
+};
+
 async function waitFor(check: () => boolean | Promise<boolean>, timeout = 10000): Promise<void> {
   const end = Date.now() + timeout;
   while (Date.now() < end) { if (await check()) return; await new Promise(resolve => setTimeout(resolve, 100)); }
@@ -34,6 +38,11 @@ export async function run(): Promise<void> {
   assert.ok(!JSON.stringify(initialPublication).includes("vscode://"));
   assert.ok(!JSON.stringify(initialPublication).includes("story-code-executed"));
   assert.ok(!(await exists(path.join(root, ".story-tools", "graph.html"))), "analysis must not generate a graph");
+  const extensionBytes = await fs.readFile(analysisPath);
+  const directPublication = await publishProjectAnalysis(root);
+  const directBytes = await fs.readFile(analysisPath);
+  assert.deepEqual(directBytes, extensionBytes, "extension and shared direct publication must be byte-identical");
+  assert.equal(directPublication.contentHash, initialPublication.contentHash);
   await fs.writeFile(path.join(root, "pages", "99.md"), "# Created target\n", "utf8");
   await waitFor(() => !allDiagnostics().some(item => String(item.code) === "missing-page"));
   await waitFor(async () => JSON.parse(await fs.readFile(analysisPath, "utf8")).contentHash !== initialPublication.contentHash);

@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { GenerationScheduler, isGeneratedFile, ownsFile, selectProject, severityNumber, statusText, summaryText, zeroBasedLocation } from "../../core";
+import {
+  GenerationScheduler,
+  isGeneratedFile,
+  ownsFile,
+  publishCurrentGeneration,
+  selectProject,
+  severityNumber,
+  stateAfterAnalysisFailure,
+  statusText,
+  summaryText,
+  zeroBasedLocation,
+} from "../../core";
 
 const summary = { pages: 4, reachablePages: 3, unreachablePages: 1, links: 5, groups: 2, errors: 1, warnings: 2 };
 
@@ -50,4 +61,31 @@ test("scheduler serializes work and reruns after a burst", async () => {
   const first = scheduler.runNow(); scheduler.schedule(); scheduler.schedule(); release(); await first;
   await new Promise(resolve => setTimeout(resolve, 25));
   assert.ok(calls.length >= 2); assert.ok(calls[1] > calls[0]); scheduler.dispose();
+});
+
+test("extension adapter delegates currentness and accepts only the latest shared result", async () => {
+  let received: any;
+  const sharedResult = {
+    analysis: { diagnostics: [] }, publication: {}, serialized: "{}\n", contentHash: "a".repeat(64),
+    summary: {}, outputPath: "/workspace/.story-tools/analysis.json", published: true, stale: false,
+  };
+  const current = await publishCurrentGeneration(async (root, options) => {
+    received = { root, generation: options.generation, current: options.isCurrent() };
+    return sharedResult;
+  }, "/workspace", 7, generation => generation === 7);
+  assert.equal(current, sharedResult);
+  assert.deepEqual(received, { root: "/workspace", generation: 7, current: true });
+
+  const stale = await publishCurrentGeneration(async (_root, options) => ({
+    ...sharedResult,
+    published: options.isCurrent(),
+    stale: !options.isCurrent(),
+  }), "/workspace", 8, () => false);
+  assert.equal(stale, undefined);
+});
+
+test("shared publication failures preserve prior extension results", () => {
+  assert.equal(stateAfterAnalysisFailure(true, "publication-failed"), "idle");
+  assert.equal(stateAfterAnalysisFailure(false, "publication-failed"), "error");
+  assert.equal(stateAfterAnalysisFailure(true, "analysis-failed"), "error");
 });

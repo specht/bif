@@ -1,13 +1,21 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { GenerationScheduler, isGeneratedFile, ownsFile, selectProject, statusText, summaryText } from "./core";
+import {
+  GenerationScheduler,
+  isGeneratedFile,
+  ownsFile,
+  ProjectAnalysisPublisher,
+  publishCurrentGeneration,
+  selectProject,
+  stateAfterAnalysisFailure,
+  statusText,
+  summaryText,
+} from "./core";
 import { groupedDiagnostics } from "./diagnostics-adapter";
 
-const { analyzeStory } = require("../../tools/lib/story-analyzer") as { analyzeStory(root: string): Promise<any> };
-const { buildBrowserAnalysisPublication, publishBrowserAnalysis } = require("../../tools/lib/browser-analysis-publication") as {
-  buildBrowserAnalysisPublication(result: any): any;
-  publishBrowserAnalysis(root: string, publication: any, generation: number, options: { isCurrent(value: number): boolean }): Promise<{ published: boolean }>;
+const { publishProjectAnalysis } = require("../../tools/lib/publish-project-analysis") as {
+  publishProjectAnalysis: ProjectAnalysisPublisher;
 };
 
 export interface ManagedProject {
@@ -28,6 +36,7 @@ export class ProjectManager implements vscode.Disposable {
     private readonly diagnostics: vscode.DiagnosticCollection,
     private readonly status: vscode.StatusBarItem,
     private readonly output: vscode.OutputChannel,
+    private readonly publishAnalysis: ProjectAnalysisPublisher = publishProjectAnalysis,
   ) {}
 
   async discover(): Promise<void> {
@@ -56,18 +65,14 @@ export class ProjectManager implements vscode.Disposable {
   private async analyse(project: ManagedProject, generation: number): Promise<void> {
     project.state = "analysing"; this.updateStatus(project); this.output.appendLine(`Analysing ${project.folder.name}…`);
     try {
-      const result = await analyzeStory(project.root);
-      if (!project.scheduler.isCurrent(generation)) return;
-      const publication = buildBrowserAnalysisPublication(result);
-      try {
-        const published = await publishBrowserAnalysis(project.root, publication, generation, { isCurrent: value => project.scheduler.isCurrent(value) });
-        if (!published.published) return;
-      } catch (error) {
-        project.state = project.result ? "idle" : "error";
-        project.lastError = error instanceof Error ? error : new Error(String(error));
-        this.output.appendLine(`Analysis publication failed for ${project.folder.name}: ${project.lastError.stack || project.lastError.message}`);
-        return;
-      }
+      const published = await publishCurrentGeneration(
+        this.publishAnalysis,
+        project.root,
+        generation,
+        value => project.scheduler.isCurrent(value),
+      );
+      if (!published) return;
+      const result = published.analysis;
       const grouped = await groupedDiagnostics(project.root, result.diagnostics);
       if (!project.scheduler.isCurrent(generation)) return;
       const nextUris = new Set(grouped.keys());
@@ -75,10 +80,13 @@ export class ProjectManager implements vscode.Disposable {
       for (const [, [uri, diagnostics]] of grouped) this.diagnostics.set(uri, diagnostics);
       project.diagnosticUris = nextUris;
       project.result = result; project.state = "idle"; project.lastError = undefined;
-      this.output.appendLine(`${project.folder.name}: ${summaryText(result.summary)}`);
+      this.output.appendLine(`${project.folder.name}: ${summaryText(result.summary)} · analysis ${published.contentHash.slice(0, 12)}`);
     } catch (error) {
-      project.state = "error"; project.lastError = error instanceof Error ? error : new Error(String(error));
-      this.output.appendLine(`Analysis failed for ${project.folder.name}: ${project.lastError.stack || project.lastError.message}`);
+      const code = typeof error === "object" && error && "code" in error ? String(error.code) : undefined;
+      project.state = stateAfterAnalysisFailure(Boolean(project.result), code);
+      project.lastError = error instanceof Error ? error : new Error(String(error));
+      const label = code === "publication-failed" ? "Analysis publication failed" : "Analysis failed";
+      this.output.appendLine(`${label} for ${project.folder.name}: ${project.lastError.stack || project.lastError.message}`);
     } finally { this.updateStatus(project); }
   }
 

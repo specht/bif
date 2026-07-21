@@ -14,6 +14,36 @@ export interface Summary {
   groups: number; errors: number; warnings: number;
 }
 
+export interface PublishedProjectAnalysis {
+  analysis: any;
+  publication: any;
+  serialized: string;
+  contentHash: string;
+  summary: any;
+  outputPath: string;
+  published: boolean;
+  stale: boolean;
+}
+
+export type ProjectAnalysisPublisher = (
+  root: string,
+  options: { generation: number; isCurrent(): boolean },
+) => Promise<PublishedProjectAnalysis>;
+
+export async function publishCurrentGeneration(
+  publisher: ProjectAnalysisPublisher,
+  root: string,
+  generation: number,
+  isCurrent: (generation: number) => boolean,
+): Promise<PublishedProjectAnalysis | undefined> {
+  const result = await publisher(root, { generation, isCurrent: () => isCurrent(generation) });
+  return result.published && !result.stale && isCurrent(generation) ? result : undefined;
+}
+
+export function stateAfterAnalysisFailure(hasPreviousResult: boolean, errorCode?: string): "idle" | "error" {
+  return hasPreviousResult && errorCode === "publication-failed" ? "idle" : "error";
+}
+
 export function severityNumber(severity: Severity): number {
   return severity === "error" ? 0 : severity === "warning" ? 1 : 2;
 }
