@@ -277,11 +277,12 @@ body.dev {
                     min-height: 0;
                     flex: 1;
                     display: grid;
-                    grid-template-rows: auto minmax(0, 1fr);
+                    grid-template-rows: auto auto minmax(0, 1fr) auto;
                     box-sizing: border-box;
                 }
 
                 #project-analysis-summary {
+                    grid-row: 1;
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
@@ -328,6 +329,53 @@ body.dev {
                         flex: none;
                         padding: 0.3em 0.65em;
                     }
+
+                    .project-problems-toggle {
+                        flex: none;
+                        padding: 0.3em 0.65em;
+                    }
+                }
+
+                #limited-analysis-notice {
+                    grid-row: 2;
+                    padding: 0.45em 0.65em;
+                    border-bottom: 1px solid #9a6700;
+                    background: #fff4ce;
+                    color: #4d3600;
+                    font-size: 0.8em;
+                    line-height: 1.35;
+                }
+
+                #limited-analysis-notice[hidden] {
+                    display: none;
+                }
+
+                #project-problems {
+                    grid-row: 4;
+                    max-height: min(15em, 35vh);
+                    overflow-y: auto;
+                    border-top: 1px solid var(--mix-80);
+                    background: var(--mix-95);
+                    box-sizing: border-box;
+
+                    &[hidden] { display: none; }
+
+                    .project-problems-list {
+                        list-style: none;
+                        margin: 0;
+                        padding: 0.35em;
+                    }
+
+                    .project-problem {
+                        width: 100%;
+                        padding: 0.35em 0.5em;
+                        border: 0;
+                        background: transparent;
+                        text-align: left;
+                        font: inherit;
+
+                        &:hover, &:focus-visible, &.selected { background: var(--mix-85); }
+                    }
                 }
 
                 #divider {
@@ -337,6 +385,7 @@ body.dev {
                 }
 
                 #graph-container {
+                    grid-row: 3;
                     box-shadow: 0.1em 0 0.1em rgba(0, 0, 0, 0.1);
                     min-width: 0;
                     min-height: 0;
@@ -364,6 +413,11 @@ body.dev {
                                 stroke: #000;
                             }
                         }
+                        &.current, &.available, &.graph-selected { opacity: 1; }
+                        &.current polygon, &.graph-selected polygon { stroke-width: 3px; }
+                        &.unreachable polygon { stroke-dasharray: 5 3; }
+                        &.missing polygon, &.has-error polygon { stroke: #b42318; }
+                        &.has-warning polygon { stroke: #9a6700; }
                     }
                     .edge {
                         opacity: 0.3;
@@ -377,6 +431,11 @@ body.dev {
                                 fill: #000;
                             }
                         }
+                        &.available, &.graph-selected { opacity: 1; }
+                        &.available path { stroke-width: 2px; }
+                        &.broken path, &.has-error path { stroke: #b42318; }
+                        &.broken polygon, &.has-error polygon { stroke: #b42318; fill: #b42318; }
+                        &.has-warning path { stroke: #9a6700; }
                     }
                 }
 
@@ -392,6 +451,7 @@ body.dev {
                     box-shadow: 0.1em 0.1em 0.25em rgba(0, 0, 0, 0.25);
                     border-radius: 0.25em;
                     border: 1px solid var(--mix-80);
+                    pointer-events: none;
                 }
             }
         }

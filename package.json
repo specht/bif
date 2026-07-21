@@ -18,6 +18,7 @@
     "@hpcc-js/wasm": "^2.34.8",
     "@playwright/test": "^1.54.1",
     "acorn": "^8.17.0",
+    "chokidar": "^4.0.3",
     "markdown-it": "^14.3.0",
     "markdown-it-attrs": "^5.0.0"
   }

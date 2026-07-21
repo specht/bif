@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 const { afterEach, test } = require("node:test");
 
 const repository = path.resolve(__dirname, "../..");
@@ -73,13 +73,38 @@ test("help succeeds without accessing a project", () => {
   assert.equal(result.status, 0);
   assert.match(result.stdout, /Usage:/);
   assert.match(result.stdout, /--project PATH/);
+  assert.match(result.stdout, /--watch/);
 });
 
 test("unknown options fail with usage guidance", () => {
-  const result = run(["--watch"], repository);
+  const result = run(["--wat"], repository);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Unknown option: --watch/);
+  assert.match(result.stderr, /Unknown option: --wat/);
   assert.match(result.stderr, /Try --help/);
+});
+
+test("--watch publishes, remains alive, updates, and shuts down cleanly", async () => {
+  const root = project();
+  const child = spawn(process.execPath, [cli, "--project", root, "--watch"], { cwd: repository, env: { ...process.env, NODE_TEST_CONTEXT: "" } });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", chunk => { stdout += chunk; });
+  child.stderr.on("data", chunk => { stderr += chunk; });
+  const waitFor = async predicate => {
+    const started = Date.now();
+    while (!predicate()) {
+      if (Date.now() - started > 7000) throw new Error(`Timed out waiting for watch CLI\n${stdout}\n${stderr}`);
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+  };
+  await waitFor(() => stdout.includes("Watching "));
+  const first = JSON.parse(fs.readFileSync(path.join(root, ".story-tools", "analysis.json"), "utf8"));
+  fs.writeFileSync(path.join(root, "pages", "4.md"), "# Watched page\n", "utf8");
+  await waitFor(() => JSON.parse(fs.readFileSync(path.join(root, ".story-tools", "analysis.json"), "utf8")).contentHash !== first.contentHash);
+  child.kill("SIGINT");
+  const code = await new Promise(resolve => child.once("exit", resolve));
+  assert.equal(code, 0, stderr);
+  assert.match(stdout, /Analysis watch stopped/);
 });
 
 test("missing --project value fails with usage guidance", () => {

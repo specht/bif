@@ -25,21 +25,22 @@ Install the browser-test dependencies once with `npm install`, then run the
 regression suite with `npm test`. To watch the tests in a browser, use
 `npm run test:headed`.
 
-In development mode, the graph pane also reads the optional generated snapshot
-`.story-tools/analysis.json` and shows project page, choice, diagnostic,
-unreachable-page, and missing-target counts above the gameplay graph. The BIF
-VS Code extension generates this file after analysis. Use the summary's
-**Refresh** button, or return focus to the browser window, to reload it without
-reloading the story. While the development tab is visible, it also checks for a
-new publication about every two seconds; polling pauses in hidden tabs and an
-immediate check runs when the tab becomes visible again. This closes the timing
-gap where Live Server reloads before the extension finishes publishing, without
-requiring another reload. Normal playback never requests or polls the file, so
-static reader deployment remains independent of the extension and Node.js.
+In development mode, the graph pane reads the optional generated snapshot
+`.story-tools/analysis.json`. One compact graph shows the complete authored
+topology—including unreachable pages, missing targets, groups, and parallel
+choices—while the running player overlays the current page, visited route,
+available choices, and rewind checkpoints. There is no separate graph mode.
+Summary counters and a collapsible **Problems** drawer expose analyzer errors
+and warnings without changing the story session.
 
-This is only a summary of project analysis; Project graph mode is not yet
-implemented. The standalone `.story-tools/graph.html` export remains available
-separately.
+The BIF VS Code extension generates the snapshot after analysis. Without the
+extension, run `npm run analysis -- --watch` while editing. The summary's
+**Refresh** button and focus/visibility refresh remain available, and a visible
+development tab checks for a new publication about every two seconds. Polling
+pauses in hidden tabs. If analysis is unavailable, the older recursive play
+graph remains as a visibly limited fallback. Normal playback never requests or
+polls the file, so static reader deployment remains independent of analysis
+tooling and Node.js.
 
 The initial Playwright suite checks that the configured story renders without
 page errors, navigation appends to the transcript while preserving the chosen
@@ -77,12 +78,24 @@ different BIF project, use:
 npm run analysis -- --project /path/to/story
 ```
 
+For extension-free continuous publication, use:
+
+```bash
+npm run analysis -- --watch
+npm run analysis -- --project /path/to/story --watch
+```
+
+Watch mode publishes once immediately, then debounces relevant project changes.
+It serializes analysis runs, ignores `.story-tools/`, dependencies, Git data,
+and editor temporary files, and continues watching after a failed update so a
+later save can recover.
+
 Publication succeeds even when the story contains analyzer errors or warnings;
 the command reports those counts in its output. Use `npm run check-story` when
-diagnostics should determine CI success. The browser development summary reads
-the generated JSON, and the BIF VS Code extension updates the same file on
-saved-file analysis through the same shared Node service. No browser needs to
-be open for publication.
+diagnostics should determine CI success. The browser development graph and
+summary read the generated JSON, and the BIF VS Code extension updates the same
+file on saved-file analysis through the same shared Node service. No browser
+needs to be open for publication.
 
 In short, the three tooling commands have distinct jobs:
 
