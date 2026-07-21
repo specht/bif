@@ -74,7 +74,7 @@ test('one graph shows complete structure and contextual Problems', async ({ page
   await expect(page.locator('#node_3')).toBeVisible();
   await expect(page.locator('#node_99')).toBeVisible();
   await expect(page.locator('#graph-container .edge')).toHaveCount(complete.edges.length);
-  await expect(page.getByRole('button', { name: `Problems (${complete.diagnostics.length})` })).toBeVisible();
+  await expect(page.getByRole('tab', { name: `Problems (${complete.diagnostics.length})` })).toBeVisible();
   await page.locator('#node_99').click();
   await expect(page.locator('#project-problems')).toBeVisible();
   await expect(page.locator('.project-problem.selected')).toContainText('missing page');
@@ -87,6 +87,44 @@ test('one graph shows complete structure and contextual Problems', async ({ page
   const after = await snapshot(page);
   expect({ ...after, focus: before.focus }).toEqual(before);
   expect(after.focus).toContain('missing page');
+});
+
+test('docked Problems and State inspector preserves graph and story behavior', async ({ page }) => {
+  await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => complete);
+  await page.goto('/?dev');
+  const inspector = page.locator('#development-inspector');
+  const problemsTab = page.getByRole('tab', { name: `Problems (${complete.diagnostics.length})` });
+  const stateTab = page.getByRole('tab', { name: 'State' });
+  await expect(inspector).toBeVisible();
+  await expect(problemsTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#state-container')).toHaveCSS('position', 'static');
+  expect(await page.locator('#state-container').evaluate(element => element.parentElement.id)).toBe('development-state');
+  const svg = await page.locator('#graph-container svg').elementHandle();
+  const before = await snapshot(page);
+
+  await problemsTab.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(stateTab).toBeFocused();
+  await expect(stateTab).toHaveAttribute('aria-selected', 'true');
+  await page.getByText('Take the bright road').click();
+  await expect(page.getByRole('heading', { name: 'The high pass' })).toBeVisible();
+  await expect(page.locator('#state-container')).toBeVisible();
+  expect(await page.evaluate(([first, current]) => first === current, [svg, await page.locator('#graph-container svg').elementHandle()])).toBe(true);
+  expect(new URL(page.url()).hash).not.toBe(before.hash);
+
+  const openHeight = await page.locator('#graph-container').evaluate(element => element.getBoundingClientRect().height);
+  await page.getByRole('button', { name: 'Collapse' }).click();
+  await expect(inspector).toHaveClass(/collapsed/);
+  const collapsedHeight = await page.locator('#graph-container').evaluate(element => element.getBoundingClientRect().height);
+  expect(collapsedHeight).toBeGreaterThan(openHeight);
+  await expect(page.locator('#development-state')).toBeHidden();
+  const viewport = await page.locator('#dev_fixed').evaluate(element => ({
+    bottom: element.getBoundingClientRect().bottom,
+    viewport: innerHeight,
+    htmlOverflow: getComputedStyle(document.documentElement).overflowY,
+  }));
+  expect(viewport.bottom).toBeLessThanOrEqual(viewport.viewport);
+  expect(viewport.htmlOverflow).toBe('hidden');
 });
 
 test('parallel runtime choices map to distinct analysis edge identities', async ({ page }) => {
@@ -128,13 +166,12 @@ test('structural refresh replaces one SVG without replaying story state', async 
   const before = await snapshot(page);
   const added = { ...complete.nodes[0], nodeId: 'node-page-6578747261', pageId: 'extra', graphLabel: 'Fresh page', start: false, group: '' };
   publication = { ...complete, contentHash: 'b'.repeat(64), summary: { ...complete.summary, pages: complete.summary.pages + 1 }, nodes: [...complete.nodes, added] };
-  await page.getByRole('button', { name: 'Refresh project analysis' }).click();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(page.locator('#node_extra')).toBeVisible();
   await expect(page.locator('#node_3')).toHaveClass(/graph-selected/);
   await expect(page.locator('#graph-container svg')).toHaveCount(1);
   const after = await snapshot(page);
-  expect({ ...after, focus: before.focus }).toEqual(before);
-  expect(after.focus).toBe('Refresh');
+  expect(after).toEqual(before);
 });
 
 test('hostile publication labels remain inert', async ({ page }) => {
@@ -152,6 +189,6 @@ test('missing analysis falls back and shows an honest limited notice after grace
   await expect(page.locator('#limited-analysis-notice')).toBeHidden();
   await expect(page.locator('#limited-analysis-notice')).toBeVisible({ timeout: 6500 });
   await expect(page.locator('#limited-analysis-notice')).toContainText('npm run analysis -- --watch');
-  await expect(page.getByRole('button', { name: 'Problems unavailable' })).toBeDisabled();
+  await expect(page.getByRole('tab', { name: 'Problems (0)' })).toBeDisabled();
   await expect(page.locator('#node_1')).toBeVisible();
 });

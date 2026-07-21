@@ -21,7 +21,7 @@ async function forceNormalMode(page, pollIntervalMs = null) {
     await route.fulfill({
       contentType: 'text/javascript',
       body: source.replace(
-        "let devMode = (window.location.port.length > 0) || (window.location.search.indexOf('dev') > 0);",
+        "let devMode = resolveBrowserMode() === 'dev';",
         'let devMode = false;',
       ).replace(
         'client: createBrowserAnalysisClient(),',
@@ -41,6 +41,19 @@ async function usePollingInterval(page, pollIntervalMs = 50) {
       body: source.replace(
         'client: createBrowserAnalysisClient(),',
         `client: createBrowserAnalysisClient({ pollIntervalMs: ${pollIntervalMs} }),`,
+      ),
+    });
+  });
+}
+
+async function useAdaptiveTiming(page, fastRetryDelaysMs, monitorIntervalMs) {
+  await page.route(/\/lib\/script\.js\?v=.*/, async route => {
+    const source = await readFile(path.join(process.cwd(), 'lib/script.js'), 'utf8');
+    await route.fulfill({
+      contentType: 'text/javascript',
+      body: source.replace(
+        'client: createBrowserAnalysisClient(),',
+        `client: createBrowserAnalysisClient({ fastRetryDelaysMs: ${JSON.stringify(fastRetryDelaysMs)}, monitorIntervalMs: ${monitorIntervalMs} }),`,
       ),
     });
   });
@@ -77,7 +90,7 @@ test('background polling recovers from the Live Server publication race', async 
   await expect(page.locator('#project-analysis-summary')).toContainText('13 pages');
   await page.locator('.pagelink', { hasText: 'Take route A' }).click();
   await expect(page.getByText('Route A set abandoned to true.')).toBeVisible();
-  await page.getByRole('button', { name: 'Refresh project analysis' }).focus();
+  await page.getByRole('tab', { name: 'State' }).focus();
   const before = await page.evaluate(() => ({
     hash: location.hash,
     transcript: document.querySelector('#content').textContent,
@@ -105,6 +118,37 @@ test('background polling recovers from the Live Server publication race', async 
   }))).toEqual(before);
 });
 
+test('adaptive sync stops fast retries after a change, then continues monitoring', async ({ page }) => {
+  await useStoryFixture(page);
+  await useAdaptiveTiming(page, [40, 40, 40], 240);
+  const validA = await fixture('valid-a.json');
+  const validB = await fixture('valid-b.json');
+  const requestTimes = [];
+  const getRequests = await analysisRoute(page, (route, request) => {
+    requestTimes.push(performance.now());
+    return fulfillJson(route, request === 1 ? validA : validB);
+  });
+  await page.goto('/?dev');
+  await expect(page.locator('#project-analysis-summary')).toContainText('14 pages');
+  expect(getRequests()).toBe(2);
+  await page.waitForTimeout(130);
+  expect(getRequests()).toBe(2);
+  await expect.poll(getRequests).toBe(3);
+  expect(requestTimes[1] - requestTimes[0]).toBeLessThan(400);
+  expect(requestTimes[2] - requestTimes[1]).toBeGreaterThan(180);
+});
+
+test('adaptive sync window is bounded before monitoring cadence', async ({ page }) => {
+  await useStoryFixture(page);
+  await useAdaptiveTiming(page, [25, 35], 220);
+  const getRequests = await analysisRoute(page, route => route.fulfill({ status: 404 }));
+  await page.goto('/?dev');
+  await expect.poll(getRequests).toBe(3);
+  await page.waitForTimeout(120);
+  expect(getRequests()).toBe(3);
+  await expect.poll(getRequests).toBe(4);
+});
+
 test('development mode loads valid analysis without changing the player', async ({ page }) => {
   await useStoryFixture(page);
   let release;
@@ -128,7 +172,8 @@ test('development mode loads valid analysis without changing the player', async 
   await expect(page.locator('#project-analysis-summary')).toContainText('21 choices');
   await expect(page.locator('#project-analysis-summary')).toContainText('1 warning');
   await expect(page.locator('#project-analysis-summary')).toContainText('2 missing targets');
-  await expect(page.getByRole('button', { name: 'Refresh project analysis' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Refresh project analysis' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Retry' })).toBeHidden();
   await expect(page.locator('#graph-container svg')).toBeVisible();
   expect(requestedUrl).toContain('/.story-tools/analysis.json?v=');
   expect(await page.evaluate(() => ({ hash: location.hash, passages: document.querySelectorAll('.story-passage').length }))).toEqual(before);
@@ -165,6 +210,38 @@ test('normal mode does not start background polling', async ({ page }) => {
   await expect(page.locator('#project-analysis-summary')).toHaveCount(0);
   await page.locator('.pagelink', { hasText: 'Take route A' }).click();
   await expect(page.getByText('Route A set abandoned to true.')).toBeVisible();
+});
+
+test('explicit game mode suppresses development traffic and explicit dev mode enables it', async ({ page }) => {
+  await useStoryFixture(page);
+  await useAdaptiveTiming(page, [20, 20], 50);
+  const valid = await fixture('valid-a.json');
+  let requests = 0;
+  await page.route(/\/\.story-tools\/analysis\.json/, route => {
+    requests += 1;
+    return fulfillJson(route, valid);
+  });
+
+  await page.goto('/?mode=game');
+  await page.waitForTimeout(180);
+  expect(requests).toBe(0);
+  await expect(page.locator('#project-analysis-summary, #development-inspector')).toHaveCount(0);
+  await page.locator('.pagelink', { hasText: 'Take route A' }).click();
+  expect(new URL(page.url()).search).toBe('?mode=game');
+
+  await page.goto('/?mode=dev');
+  await expect(page.locator('#project-analysis-summary')).toContainText('13 pages');
+  await expect(page.locator('#development-inspector')).toBeVisible();
+  expect(requests).toBeGreaterThan(0);
+});
+
+test('unknown mode falls back to automatic development detection', async ({ page }) => {
+  await useStoryFixture(page);
+  const valid = await fixture('valid-a.json');
+  const getRequests = await analysisRoute(page, route => fulfillJson(route, valid));
+  await page.goto('/?mode=preview');
+  await expect(page.locator('#project-analysis-summary')).toContainText('13 pages');
+  expect(getRequests()).toBeGreaterThan(0);
 });
 
 test('missing analysis is a quiet unavailable state', async ({ page }) => {
@@ -205,10 +282,14 @@ for (const [name, response, reason] of [
   });
 }
 
-test('manual refresh updates counters without touching story state', async ({ page }) => {
+test('contextual retry updates counters without touching story state', async ({ page }) => {
   await useStoryFixture(page);
-  const responses = [await fixture('valid-a.json'), await fixture('valid-b.json')];
-  await analysisRoute(page, (route, request) => fulfillJson(route, responses[Math.min(request - 1, 1)]));
+  const validA = await fixture('valid-a.json');
+  const validB = await fixture('valid-b.json');
+  let recover = false;
+  await analysisRoute(page, (route, request) => request === 1
+    ? fulfillJson(route, validA)
+    : recover ? fulfillJson(route, validB) : route.fulfill({ status: 503 }));
   await page.goto('/?dev');
   await expect(page.locator('#project-analysis-summary')).toContainText('13 pages');
   await page.locator('.pagelink', { hasText: 'Take route A' }).click();
@@ -223,7 +304,9 @@ test('manual refresh updates counters without touching story state', async ({ pa
     scrollTop: document.querySelector('#game_pane').scrollTop,
   }));
 
-  await page.getByRole('button', { name: 'Refresh project analysis' }).click();
+  await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
+  recover = true;
+  await page.getByRole('button', { name: 'Retry' }).click();
   await expect(page.locator('#project-analysis-summary')).toContainText('14 pages');
   await expect(page.locator('#project-analysis-summary')).toContainText('2 errors');
   const after = await page.evaluate(() => ({
@@ -236,25 +319,24 @@ test('manual refresh updates counters without touching story state', async ({ pa
     scrollTop: document.querySelector('#game_pane').scrollTop,
   }));
   expect(after).toEqual(before);
-  await expect(page.getByRole('button', { name: 'Refresh project analysis' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Retry' })).toBeHidden();
 });
 
 test('unchanged hash keeps summary nodes and announcements stable', async ({ page }) => {
   await useStoryFixture(page);
   const valid = await fixture('valid-a.json');
-  await analysisRoute(page, route => fulfillJson(route, valid));
+  const getRequests = await analysisRoute(page, route => fulfillJson(route, valid));
   await page.goto('/?dev');
   const counts = page.locator('#project-analysis-counts');
   await expect(counts).toContainText('13 pages');
   const beforeHandle = await counts.elementHandle();
   const beforeStatus = await page.locator('#project-analysis-status').textContent();
 
-  await page.getByRole('button', { name: 'Refresh project analysis' }).click();
-  await expect(page.getByRole('button', { name: 'Refresh project analysis' })).toHaveAttribute('aria-busy', 'false');
+  await expect.poll(getRequests).toBeGreaterThanOrEqual(2);
   const afterHandle = await counts.elementHandle();
   expect(await page.evaluate(([before, after]) => before === after, [beforeHandle, afterHandle])).toBe(true);
   expect(await page.locator('#project-analysis-status').textContent()).toBe(beforeStatus);
-  await expect(page.getByRole('button', { name: 'Refresh project analysis' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Refresh project analysis' })).toHaveCount(0);
 });
 
 test('failed refresh retains the last valid summary and marks it stale', async ({ page }) => {
@@ -267,7 +349,6 @@ test('failed refresh retains the last valid summary and marks it stale', async (
   await expect(page.locator('#project-analysis-summary')).toContainText('13 pages');
   const transcript = await page.locator('#content').textContent();
 
-  await page.getByRole('button', { name: 'Refresh project analysis' }).click();
   await expect(page.locator('#project-analysis-summary')).toContainText('may be out of date');
   await expect(page.locator('#project-analysis-summary')).toContainText('13 pages');
   expect(await page.locator('#content').textContent()).toBe(transcript);
@@ -279,9 +360,8 @@ test('focus and visibility refreshes are debounced without moving focus', async 
   const valid = await fixture('valid-a.json');
   const getRequests = await analysisRoute(page, route => fulfillJson(route, valid));
   await page.goto('/?dev');
-  const refresh = page.getByRole('button', { name: 'Refresh project analysis' });
-  await expect(refresh).toHaveAttribute('aria-busy', 'false');
-  await refresh.focus();
+  const stateTab = page.getByRole('tab', { name: 'State' });
+  await stateTab.focus();
 
   await page.evaluate(() => {
     window.dispatchEvent(new Event('focus'));
@@ -289,7 +369,7 @@ test('focus and visibility refreshes are debounced without moving focus', async 
     window.dispatchEvent(new Event('focus'));
   });
   await expect.poll(getRequests).toBe(2);
-  await expect(refresh).toBeFocused();
+  await expect(stateTab).toBeFocused();
   expect(getRequests()).toBe(2);
 });
 
@@ -317,20 +397,18 @@ test('active requests do not overlap and closely spaced triggers coalesce once',
     }
   });
   await page.goto('/?dev');
-  const refresh = page.getByRole('button', { name: 'Refresh project analysis' });
   await expect(page.locator('#project-analysis-summary')).toContainText('13 pages');
-  await refresh.click();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect.poll(getRequests).toBe(2);
   await page.evaluate(() => {
     window.dispatchEvent(new Event('focus'));
     document.dispatchEvent(new Event('visibilitychange'));
   });
-  await refresh.click();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   expect(getRequests()).toBe(2);
   expect(maximumActive).toBe(1);
   releaseActive();
   await expect.poll(getRequests).toBe(3);
-  await expect(refresh).toHaveAttribute('aria-busy', 'false');
   await expect(page.locator('#project-analysis-summary')).toContainText('14 pages');
   expect(maximumActive).toBe(1);
   expect(getRequests()).toBe(3);
@@ -368,9 +446,8 @@ test('polling pauses while hidden and refreshes immediately when visible', async
     return fulfillJson(route, valid);
   });
   await page.goto('/?dev');
-  const refresh = page.getByRole('button', { name: 'Refresh project analysis' });
-  await expect(refresh).toHaveAttribute('aria-busy', 'false');
-  await refresh.focus();
+  const stateTab = page.getByRole('tab', { name: 'State' });
+  await stateTab.focus();
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, value: true });
     document.dispatchEvent(new Event('visibilitychange'));
@@ -387,7 +464,7 @@ test('polling pauses while hidden and refreshes immediately when visible', async
   });
   await expect.poll(getRequests).toBeGreaterThan(hiddenCount);
   expect(getRequests()).toBe(hiddenCount + 1);
-  await expect(refresh).toBeFocused();
+  await expect(stateTab).toBeFocused();
   releaseVisibleRefresh();
   await expect.poll(getRequests).toBeGreaterThan(hiddenCount + 1);
 });
@@ -418,7 +495,7 @@ test('repeated hashes stay stable, a new hash renders once, and polling continue
   await expect(counts).toContainText('14 pages');
   const updated = await counts.elementHandle();
   const requestsAfterUpdate = getRequests();
-  await expect.poll(getRequests).toBeGreaterThan(requestsAfterUpdate + 1);
+  await expect.poll(getRequests).toBeGreaterThan(requestsAfterUpdate);
   expect(await page.evaluate(([first, current]) => first === current, [updated, await counts.elementHandle()])).toBe(true);
   await expect(counts).toContainText('14 pages');
   await expect(page.locator('.project-analysis-pages')).toHaveAttribute('data-mutations', '1');
@@ -537,13 +614,13 @@ test('summary is keyboard accessible and reduced-motion safe', async ({ page }) 
   const valid = await fixture('valid-a.json');
   await analysisRoute(page, route => fulfillJson(route, valid));
   await page.goto('/?dev');
-  const refresh = page.getByRole('button', { name: 'Refresh project analysis' });
-  await expect(refresh).toBeVisible();
+  const stateTab = page.getByRole('tab', { name: 'State' });
+  await expect(stateTab).toBeVisible();
   await page.getByRole('link', { name: 'Take route B' }).focus();
   await page.keyboard.press('Tab');
-  await expect(refresh).toBeFocused();
+  await expect(stateTab).toBeFocused();
   await expect(page.locator('#project-analysis-status')).toHaveAttribute('aria-live', 'polite');
-  const styles = await refresh.evaluate(element => ({
+  const styles = await stateTab.evaluate(element => ({
     transition: getComputedStyle(element).transitionDuration,
     outline: getComputedStyle(element).outlineStyle,
   }));

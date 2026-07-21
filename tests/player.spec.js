@@ -23,7 +23,7 @@ async function useScrollFixture(page, { normalMode = false } = {}) {
       await route.fulfill({
         contentType: 'text/javascript',
         body: source.replace(
-          "let devMode = (window.location.port.length > 0) || (window.location.search.indexOf('dev') > 0);",
+          "let devMode = resolveBrowserMode() === 'dev';",
           'let devMode = false;',
         ),
       });
@@ -83,6 +83,31 @@ test('choosing a page appends its passage to the transcript', async ({ page }) =
   await expect(page.getByText('Du umkreist vorsichtig den Höhleneingang', { exact: false })).toBeVisible();
   expect(new URL(page.url()).hash).not.toBe(initialHash);
   expect(pageErrors).toEqual([]);
+});
+
+test('explicit development mode survives history, reload, rewind, and restart', async ({ page }) => {
+  await page.goto('/?mode=dev');
+  await expect(page.locator('#development-inspector')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => location.hash.length)).toBeGreaterThan(1);
+  const initialUrl = page.url();
+  await page.getByText('Du untersuchst zunächst den Höhleneingang.').click();
+  await expect(page).not.toHaveURL(initialUrl);
+  expect(new URL(page.url()).search).toBe('?mode=dev');
+  const middleUrl = page.url();
+  await page.getByText('Weiter…').click();
+  await expect(page).not.toHaveURL(middleUrl);
+  await page.goBack();
+  await expect(page).toHaveURL(middleUrl);
+  expect(new URL(page.url()).search).toBe('?mode=dev');
+  await page.goForward();
+  expect(new URL(page.url()).search).toBe('?mode=dev');
+  await page.reload();
+  expect(new URL(page.url()).search).toBe('?mode=dev');
+  await page.locator('#node_1').click();
+  expect(new URL(page.url()).search).toBe('?mode=dev');
+  await page.locator('#bu_reset_game').click();
+  await expect(page.locator('#development-inspector')).toBeVisible();
+  expect(new URL(page.url()).search).toBe('?mode=dev');
 });
 
 test('graph rewind clears variables from an abandoned route', async ({ page }) => {

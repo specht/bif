@@ -30,17 +30,27 @@ In development mode, the graph pane reads the optional generated snapshot
 topology—including unreachable pages, missing targets, groups, and parallel
 choices—while the running player overlays the current page, visited route,
 available choices, and rewind checkpoints. There is no separate graph mode.
-Summary counters and a collapsible **Problems** drawer expose analyzer errors
-and warnings without changing the story session.
+Summary counters and a docked, collapsible **Problems (N) | State** inspector
+expose analyzer diagnostics and runtime state without covering the graph or
+changing the story session.
 
 The BIF VS Code extension generates the snapshot after analysis. Without the
-extension, run `npm run analysis -- --watch` while editing. The summary's
-**Refresh** button and focus/visibility refresh remain available, and a visible
-development tab checks for a new publication about every two seconds. Polling
-pauses in hidden tabs. If analysis is unavailable, the older recursive play
-graph remains as a visibly limited fallback. Normal playback never requests or
-polls the file, so static reader deployment remains independent of analysis
-tooling and Node.js.
+extension, run `npm run analysis -- --watch` while editing. After loading or
+returning to a visible tab, the browser makes bounded quick checks (250, 250,
+500, 500, and 1000 milliseconds), then monitors about every four seconds. This
+handles the race where Live Server reloads before publication finishes while
+still catching later updates that cause no reload. Checks pause in hidden tabs.
+There is no permanent Refresh control; an unhealthy analysis notice offers a
+contextual **Retry** action. If analysis is unavailable, the older recursive
+play graph remains as a visibly limited fallback. Normal playback never
+requests or polls the file, so static reader deployment remains independent of
+analysis tooling and Node.js.
+
+Browser behavior can be selected explicitly with `?mode=dev` or `?mode=game`.
+Game mode always uses the published reader layout with no analysis traffic;
+development mode forces the graph and inspector. With no recognized `mode`
+value, the existing port/URL automatic detection remains in effect. The mode
+stays in the URL query while story session history continues to use the hash.
 
 The initial Playwright suite checks that the configured story renders without
 page errors, navigation appends to the transcript while preserving the chosen
