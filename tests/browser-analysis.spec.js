@@ -373,6 +373,7 @@ test('failed refresh retains the last valid summary and marks it stale', async (
     : route.fulfill({ status: 503, body: 'Unavailable' }));
   await page.goto('/?dev');
   await expect(page.locator('#project-analysis-summary')).toContainText('13 pages');
+  await expect(page.getByRole('heading', { name: 'Rewind state fixture' })).toBeVisible();
   const transcript = await page.locator('#content').textContent();
 
   await expect(page.locator('#project-analysis-summary')).toContainText('may be out of date');
@@ -628,7 +629,10 @@ test('hostile publication text is rendered as inert text', async ({ page }) => {
   const hostile = await fixture('hostile.json');
   await analysisRoute(page, route => fulfillJson(route, hostile));
   await page.goto('/?dev');
-  await expect(page.locator('#project-analysis-title')).toContainText('</script><img');
+  expect(JSON.parse(hostile).project.title).toBe('</script><img src=x onerror=globalThis.analysisInjected=true>');
+  await expect(page).toHaveTitle('Rewind state fixture');
+  await expect(page.locator('#project-analysis-title')).toHaveCount(0);
+  await expect(page.locator('#project-analysis-summary')).not.toContainText('</script><img');
   await expect(page.locator('#project-analysis-summary img')).toHaveCount(0);
   expect(await page.evaluate(() => globalThis.analysisInjected)).toBeUndefined();
   await expect(page.locator('#project-analysis-summary')).toContainText('1 page');
@@ -689,8 +693,6 @@ test('summary is keyboard accessible and reduced-motion safe', async ({ page }) 
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Fit graph' })).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Auto-follow' })).toBeFocused();
-  await page.keyboard.press('Tab');
   await expect(page.getByRole('separator', { name: 'Resize development inspector' })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(stateTab).toBeFocused();
@@ -720,10 +722,7 @@ test('graph viewport math keeps wheel and pinch focal points anchored', async ({
       { minWidth: 200, maxWidth: 4000 });
     const oldPinchWorld = viewport.clientPointToWorld(start, box, { x: 300, y: 200 });
     const newPinchWorld = viewport.clientPointToWorld(pinch, box, { x: 340, y: 225 });
-    const visibleFollow = viewport.followViewBoxTarget({ x: 0, y: 0, width: 1000, height: 500 }, { x: 300, y: 180, width: 100, height: 50 });
-    const distantFollow = viewport.followViewBoxTarget({ x: 0, y: 0, width: 1000, height: 500 }, { x: 1200, y: 200, width: 100, height: 50 });
-    const oversizedFollow = viewport.followViewBoxTarget({ x: 0, y: 0, width: 200, height: 100 }, { x: 300, y: 100, width: 220, height: 80 }, { maxWidth: 600 });
-    return { before, after, restored, start, pinch, oldPinchWorld, newPinchWorld, visibleFollow, distantFollow, oversizedFollow };
+    return { before, after, restored, start, pinch, oldPinchWorld, newPinchWorld };
   });
   expect(result.after.x).toBeCloseTo(result.before.x, 8);
   expect(result.after.y).toBeCloseTo(result.before.y, 8);
@@ -731,9 +730,4 @@ test('graph viewport math keeps wheel and pinch focal points anchored', async ({
   expect(result.pinch.width).toBeLessThan(result.start.width);
   expect(result.newPinchWorld.x).toBeCloseTo(result.oldPinchWorld.x, 8);
   expect(result.newPinchWorld.y).toBeCloseTo(result.oldPinchWorld.y, 8);
-  expect(result.visibleFollow).toBeNull();
-  expect(result.distantFollow.width).toBe(1000);
-  expect(result.distantFollow.x).toBeCloseTo(450, 8);
-  expect(result.oversizedFollow.width).toBeGreaterThan(200);
-  expect(result.oversizedFollow.width).toBeLessThanOrEqual(600);
 });

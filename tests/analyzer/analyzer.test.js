@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
 const path = require("node:path");
 const { test } = require("node:test");
+const acorn = require("acorn");
 const { analyzeStory } = require("../../tools/lib/story-analyzer");
 const { normalizeAcornError } = require("../../tools/lib/javascript-checker");
 
@@ -79,11 +80,16 @@ test("Assigning to rvalue publishes a semantic message and structured local coor
   assert.doesNotMatch(item.message, /Script 1|\(2:21\)/);
 });
 
-test("bork parser failure publishes only its semantic message at the page-level location", async () => {
-  const result = await analyzeStory(fixture("bork-script"));
+test("bork parser failure retains raw Acorn location but publishes only its semantic message", async () => {
+  const source = "\n    crew_count -= 2;\n    bork bork bork\n";
+  assert.throws(() => acorn.parse(source, { ecmaVersion: "latest", locations: true }), error => {
+    assert.match(error.message, /Unexpected token \(3:9\)$/);
+    return true;
+  });
+  const result = await analyzeStory(fixture("bork-script-page4"));
   const item = result.diagnostics.find(diagnostic => diagnostic.code === "script-syntax");
   assert.equal(item.message, "Unexpected token");
-  assert.equal(item.file, "pages/1.md");
+  assert.equal(item.file, "pages/4.md");
   assert.equal(item.line, 21);
   assert.equal(item.scriptIndex, 1);
   assert.equal(item.scriptLine, 3);

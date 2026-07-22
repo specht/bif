@@ -324,13 +324,6 @@ body.dev {
                         white-space: nowrap;
                     }
 
-                    .project-analysis-title + #project-analysis-counts::before {
-                        content: '·';
-                        margin-right: 0.45em;
-                        color: var(--mix-60);
-                        font-weight: 400;
-                    }
-
                     .project-analysis-pages + .project-analysis-choices::before,
                     .project-analysis-choices ~ .project-analysis-count:not([hidden])::before {
                         content: '·';
@@ -345,14 +338,6 @@ body.dev {
 
                     .project-analysis-count { display: inline-flex; align-items: center; gap: 0.2em; }
                     .project-analysis-count[hidden] { display: none; }
-
-                    .project-analysis-title {
-                        font-weight: 600;
-                        min-width: 0;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                        white-space: nowrap;
-                    }
 
                     .project-analysis-errors,
                     .project-analysis-warnings {
@@ -626,7 +611,6 @@ body.dev {
                     #project-analysis-summary .development-title-row { align-items: flex-start; flex-wrap: wrap; }
                     #project-analysis-summary .development-summary-items { flex: 1 1 auto; flex-wrap: wrap; }
                     #project-analysis-summary #project-analysis-counts { flex-wrap: wrap; }
-                    #project-analysis-summary .project-analysis-title { max-width: 100%; }
                     #project-problems .project-problem {
                         grid-template-columns: 1.25em minmax(0, 1fr);
                     }

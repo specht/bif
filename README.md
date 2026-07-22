@@ -34,10 +34,11 @@ Summary counters and a docked, collapsible **Problems (N) | State** inspector
 expose analyzer diagnostics and runtime state without covering the graph or
 changing the story session.
 
-The compact single-line authoring toolbar shows the story-derived title first,
-then page count, choice count, and status, with **Restart**, **Fit graph**, and
-**Auto-follow** grouped at the right. It
-wraps without dropping the title on narrow screens and uses one shared chrome
+The compact single-line authoring toolbar intentionally starts with page count,
+choice count, and status, with **Restart** and **Fit graph** grouped at the right.
+The story title remains authoritative analysis metadata and the browser-tab title,
+but is omitted from this compact toolbar. The toolbar
+wraps safely on narrow screens and uses one shared chrome
 font size and line height. Zero-valued problem metrics are omitted; a clean project is marked
 with a green Tabler check icon while the words `No problems` retain the normal
 summary color. Problems form one flat, globally source-sorted list with a
@@ -46,8 +47,9 @@ Each problem immediately shows a compact highlighted source excerpt with line
 numbers and a translucent range marker. Empty outer context lines are trimmed
 without removing internal blank lines or changing source line numbers. Each source file is fetched only once
 per analysis hash, and only unusually long source lines scroll horizontally.
-Located messages use the
-page-level form `(line N)` instead of embedded-parser coordinates. The inspector opens and closes with a short transition,
+Located messages use the page-level form `(line N)`. Script block numbers and
+parser-local coordinates remain internal structured data and are not included in
+the semantic message shown in Problems. The inspector opens and closes with a short transition,
 disabled when reduced motion is requested, and its horizontal separator can be
 dragged or adjusted with Arrow keys (Shift uses larger steps). In development
 mode the restart control lives in the top toolbar instead of covering the
@@ -61,12 +63,10 @@ graph and transcript navigation retain a visible passage focus indicator.
 
 Graph navigation uses one SVG `viewBox` model: wheel/trackpad zoom remains
 anchored below the pointer, pointer drag pans, and touch supports one-finger pan
-and midpoint-anchored two-finger pinch. The graph toolbar provides **Fit graph**
-and a persisted, initially-off **Auto-follow** toggle. Follow uses a 15% inner
-viewport margin and a short cancelable transition, preserving zoom and moving
-only enough to make the complete current node comfortably visible. Fit or any
-manual pan/zoom disables and cancels it. Programmatic movement is immediate
-when reduced motion is requested.
+and midpoint-anchored two-finger pinch. The graph toolbar provides **Fit graph**;
+the former Auto-follow control and its persisted state were removed because an
+automatic viewport transition could move the graph completely out of view.
+Programmatic movement is immediate when reduced motion is requested.
 
 The BIF VS Code extension generates the snapshot after analysis. Without the
 extension, run `npm run analysis -- --watch` while editing. After loading or

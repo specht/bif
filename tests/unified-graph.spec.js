@@ -65,7 +65,7 @@ test('broken entry passage keeps the complete development shell alive across rel
   await expect(page).toHaveTitle('Broken entry fixture');
   await expect(page.locator('.development-title-row')).toBeVisible();
   await expect(page.locator('.development-title-row #bu_reset_game')).toBeVisible();
-  await expect(page.locator('#project-analysis-summary')).toContainText('Broken entry fixture');
+  await expect(page.locator('#project-analysis-summary')).not.toContainText('Broken entry fixture');
   await expect(page.locator('#graph-container')).toBeVisible();
   await expect(page.locator('#graph-container svg')).toHaveCount(1);
   await expect(page.locator('#development-inspector')).toBeVisible();
@@ -170,9 +170,10 @@ test('summary hides zero metrics and Problems sort and wrap as a flat list', asy
   await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => publication);
   await page.goto('/?dev');
   const summary = page.locator('#project-analysis-counts');
-  await expect(page.locator('.development-title-row')).toContainText('Start of the authoring map');
+  await expect(page).toHaveTitle('Start of the authoring map');
+  await expect(page.locator('.development-title-row')).not.toContainText('Start of the authoring map');
   await expect(page.locator('.development-title-row')).toContainText('Restart');
-  await expect(page.locator('.development-summary-items').first()).toContainText('Start of the authoring map');
+  await expect(page.locator('.development-summary-items').first()).toHaveText(/^3 pages/);
   await expect(summary).toContainText('No problems');
   for (const metric of ['errors', 'warnings', 'unreachable', 'missing']) await expect(page.locator(`.project-analysis-${metric}`)).toBeHidden();
 
@@ -204,20 +205,71 @@ test('Problems formats semantic diagnostics with page-level lines', async ({ pag
   await expect(page.locator('.problem-file-group, .problem-file-header')).toHaveCount(0);
   await expect(page.locator('.project-problem', { hasText: 'Meaningful (context)' })).not.toContainText('(line undefined)');
   await expect(page.locator('.problem-location')).toHaveCount(0);
+  const normalized = await page.evaluate(async diagnostic => {
+    const messages = await import(`/lib/browser-diagnostic-message.js?test=${Date.now()}`);
+    const client = await import(`/lib/browser-analysis-client.js?test=${Date.now()}`);
+    const publication = {
+      schemaVersion: 1,
+      contentHash: 'same-source',
+      project: { title: 'Compatibility', pagesPath: 'pages', startPage: '1' },
+      summary: { pages: 1, reachablePages: 1, unreachablePages: 0, choices: 0, groups: 0, missingTargets: 0, errors: 1, warnings: 0 },
+      nodes: [{ diagnostics: [diagnostic] }], edges: [], groups: [], diagnostics: [diagnostic],
+    };
+    const first = messages.normalizeBrowserDiagnostic(diagnostic);
+    const second = messages.normalizeBrowserDiagnostic(first);
+    const parsed = client.validateBrowserAnalysis(publication).model;
+    return {
+      first: first.message,
+      second: second.message,
+      ingested: parsed.diagnostics[0].message,
+      nested: parsed.nodes[0].diagnostics[0].message,
+      meaningful: messages.getPublicDiagnosticMessage({ message: 'Meaningful (context)', line: 4 }),
+    };
+  }, diagnostic);
+  expect(normalized).toEqual({
+    first: 'Assigning to rvalue', second: 'Assigning to rvalue',
+    ingested: 'Assigning to rvalue', nested: 'Assigning to rvalue',
+    meaningful: 'Meaningful (context)',
+  });
 });
 
 test('real bork publication and browser output keep parser-local context internal', async ({ page }) => {
-  const root = path.join(process.cwd(), 'test-fixtures/analyzer/bork-script');
+  const root = path.join(process.cwd(), 'test-fixtures/analyzer/bork-script-page4');
   const publication = buildBrowserAnalysisPublication(await analyzeStory(root));
   const diagnostic = publication.diagnostics.find(item => item.code === 'script-syntax');
-  expect(diagnostic).toMatchObject({ message: 'Unexpected token', file: 'pages/1.md', line: 21, scriptIndex: 1, scriptLine: 3, scriptColumn: 9 });
-  await configure(page, 'test-fixtures/analyzer/bork-script/pages', () => publication);
+  expect(diagnostic).toMatchObject({ message: 'Unexpected token', file: 'pages/4.md', line: 21, scriptIndex: 1, scriptLine: 3, scriptColumn: 9 });
+  await configure(page, 'test-fixtures/analyzer/bork-script-page4/pages', () => publication);
   await page.goto('/?dev');
   const message = page.locator('.problem-message', { hasText: 'Unexpected token' });
   await expect(message).toHaveText('Unexpected token (line 21)');
+  await expect(message.locator('..').locator('.problem-path')).toHaveText('pages/4.md');
   await expect(page.locator('#project-problems')).not.toContainText('Script 1');
   await expect(page.locator('#project-problems')).not.toContainText('(3:9)');
+  await page.getByRole('link', { name: 'Open the broken passage' }).click();
   await expect(page.locator('#content .story-error')).toHaveText('This passage could not be completed.See Problems below for details.');
+});
+
+test('a newer analysis identity refreshes a legacy diagnostic with the same source identity', async ({ page }) => {
+  const legacy = {
+    ...complete,
+    contentHash: 'a'.repeat(64),
+    analysisHash: 'b'.repeat(64),
+    diagnostics: [{ severity: 'error', code: 'script-syntax', file: 'pages/4.md', line: 21, column: 10, message: 'Script 1: Unexpected token (3:9)', scriptIndex: 1, scriptLine: 3, scriptColumn: 9 }],
+  };
+  let publication = legacy;
+  await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => publication);
+  await page.goto('/?dev');
+  const message = page.locator('.problem-message', { hasText: 'Unexpected token' });
+  await expect(message).toHaveText('Unexpected token (line 21)');
+
+  publication = {
+    ...legacy,
+    analysisHash: 'c'.repeat(64),
+    diagnostics: [{ ...legacy.diagnostics[0], message: 'Unexpected token', line: 22 }],
+  };
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(message).toHaveText('Unexpected token (line 22)');
+  await expect(page.locator('#project-problems')).not.toContainText(/Script 1|\(3:9\)/);
 });
 
 test('problem source is immediate, cached per file, marked, highlighted, and safely rendered', async ({ page }) => {
@@ -306,29 +358,34 @@ test('shared icons align with labels and clean text remains neutral', async ({ p
   expect(colors.icon).not.toBe(colors.normal);
 });
 
-test('authoring toolbar is compact, title-first, responsive, and typographically uniform', async ({ page }) => {
+test('authoring toolbar intentionally omits the title and remains compact and responsive', async ({ page }) => {
   await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => complete);
   await page.goto('/?dev');
   await expect(page.locator('.problem-source-text').first()).toBeVisible();
   const desktop = await page.evaluate(() => {
     const row = document.querySelector('.development-title-row').getBoundingClientRect();
-    const title = document.querySelector('.project-analysis-title').getBoundingClientRect();
+    const pages = document.querySelector('.project-analysis-pages').getBoundingClientRect();
     const restart = document.querySelector('#bu_reset_game').getBoundingClientRect();
-    const selectors = ['.project-analysis-title', '.project-analysis-pages', '#bu_reset_game', '#problems-tab', '.development-inspector-collapse', '.project-problem', '.problem-source-text'];
+    const selectors = ['.project-analysis-pages', '#bu_reset_game', '#problems-tab', '.development-inspector-collapse', '.project-problem', '.problem-source-text'];
     return {
-      row: row.toJSON(), title: title.toJSON(), restart: restart.toJSON(),
+      row: row.toJSON(), pages: pages.toJSON(), restart: restart.toJSON(),
       fonts: selectors.map(selector => getComputedStyle(document.querySelector(selector)).fontSize),
       lines: selectors.slice(0, -1).map(selector => getComputedStyle(document.querySelector(selector)).lineHeight),
     };
   });
-  expect(desktop.title.left).toBeLessThan(desktop.restart.left);
-  expect(Math.abs(desktop.title.top - desktop.restart.top)).toBeLessThan(8);
+  await expect(page).toHaveTitle('Start of the authoring map');
+  await expect(page.locator('.project-analysis-title')).toHaveCount(0);
+  await expect(page.locator('.development-summary-items')).not.toContainText('Complete authoring fixture');
+  await expect(page.locator('#project-analysis-counts')).toHaveText(/^3 pages/);
+  expect(desktop.pages.left).toBeLessThan(desktop.restart.left);
+  expect(Math.abs(desktop.pages.top - desktop.restart.top)).toBeLessThan(8);
   expect(desktop.row.height).toBeLessThan(38);
   expect(new Set(desktop.fonts).size).toBe(1);
   expect(new Set(desktop.lines).size).toBe(1);
   await expect(page.locator('#graph-toolbar')).toHaveCount(0);
   const actions = page.locator('.development-toolbar-actions');
-  await expect(actions.getByRole('button')).toHaveText(['Restart', 'Fit graph', 'Auto-follow']);
+  await expect(actions.getByRole('button')).toHaveText(['Restart', 'Fit graph']);
+  await expect(page.getByRole('button', { name: 'Auto-follow' })).toHaveCount(0);
   const actionGeometry = await actions.getByRole('button').evaluateAll(elements => elements.map(element => ({
     height: element.getBoundingClientRect().height,
     fontSize: getComputedStyle(element).fontSize,
@@ -338,27 +395,24 @@ test('authoring toolbar is compact, title-first, responsive, and typographically
 
   await page.setViewportSize({ width: 620, height: 720 });
   const narrow = await page.evaluate(() => ({
-    title: document.querySelector('.project-analysis-title').getBoundingClientRect().width,
+    pages: document.querySelector('.project-analysis-pages').getBoundingClientRect().width,
     restart: document.querySelector('#bu_reset_game').getBoundingClientRect().width,
     overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
   }));
-  expect(narrow.title).toBeGreaterThan(0);
+  expect(narrow.pages).toBeGreaterThan(0);
   expect(narrow.restart).toBeGreaterThan(0);
   expect(narrow.overflow).toBe(false);
 });
 
-test('graph wheel, pointer and touch gestures update one persistent viewport and disable follow', async ({ page }) => {
+test('graph wheel, pointer, touch, and Fit update one visible viewport without Auto-follow', async ({ page }) => {
   await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => complete);
   await page.goto('/?dev');
   const svg = page.locator('#graph-container svg');
-  const autoFollow = page.getByRole('button', { name: 'Auto-follow' });
-  await autoFollow.click();
-  await expect(autoFollow).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Auto-follow' })).toHaveCount(0);
   const original = await svg.getAttribute('viewBox');
   const box = await svg.boundingBox();
   await svg.dispatchEvent('wheel', { deltaY: -90, clientX: box.x + 40, clientY: box.y + 40 });
   await expect.poll(() => svg.getAttribute('viewBox')).not.toBe(original);
-  await expect(autoFollow).toHaveAttribute('aria-pressed', 'false');
 
   const afterWheel = await svg.getAttribute('viewBox');
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -392,10 +446,7 @@ test('graph wheel, pointer and touch gestures update one persistent viewport and
   expect(touchResult.touchAction).toBe('none');
   await expect(page.locator('#graph-container svg')).toHaveCount(1);
 
-  await autoFollow.click();
-  await expect(autoFollow).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Fit graph' }).click();
-  await expect(autoFollow).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('#graph-container svg')).toHaveCount(1);
 });
 
@@ -464,15 +515,9 @@ test('resizable inspector and development UI state survive reload without rebuil
   await expect.poll(() => inspector.evaluate((element, expected) => Math.abs(element.getBoundingClientRect().height - expected), resizedHeight)).toBeLessThan(7);
   await expect(page.locator('#graph-container svg')).toHaveAttribute('viewBox', savedViewBox);
   await expect(page.locator('#graph-container svg')).toHaveCount(1);
-  const follow = page.getByRole('button', { name: 'Auto-follow' });
-  await follow.click();
-  await expect(follow).toHaveAttribute('aria-pressed', 'true');
-  await page.waitForTimeout(350);
-  const followedViewBox = await page.locator('#graph-container svg').getAttribute('viewBox');
-  await page.reload();
-  await expect(follow).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#graph-container svg')).toHaveAttribute('viewBox', followedViewBox);
+  await expect(page.getByRole('button', { name: 'Auto-follow' })).toHaveCount(0);
   const storage = await page.evaluate(() => Object.values(sessionStorage).join('\n'));
+  expect(storage).not.toContain('graphAutoFollow');
   expect(storage).not.toContain(process.cwd());
   expect(storage).not.toContain('crew_count');
 });
