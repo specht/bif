@@ -310,6 +310,16 @@ message rather than an internal stack trace.
 Keyboard interaction
 --------------------
 
+New content from a player-triggered page change or local dialogue choice is
+revealed in semantic chunks. Short paragraphs and quotations appear whole;
+long plain prose may appear in one- or two-sentence groups. Headings, images,
+lists, tables, code, custom HTML blocks, and each live choice set remain whole,
+with live choices revealed last. Click or tap the story pane, or press Space,
+Enter, or Escape, to show the complete result immediately. Reduced-motion and
+restored sessions appear immediately. Scripts, expressions, state, history, and
+the final DOM all commit before this visual presentation begins; authors do not
+need special syntax.
+
 Ordinary story choices remain links: use Tab to focus them and Enter to follow
 them. Temporary choices created by `presentChoice()` remain buttons and support
 both Space and Enter. After keyboard navigation, focus moves to the newly

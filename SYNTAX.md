@@ -214,6 +214,8 @@ The transcript accumulates completed page instances. BIF stores a compressed, ve
 
 Choice identities come from stable source position and ordering. Authors do not write them. Editing choice layout can invalidate an old saved selection; BIF skips an unknown selection rather than activating a different choice.
 
+Newly committed page content is visually revealed in semantic chunks. Short prose appears whole; longer plain prose may use sentence groups, while headings, quotations, images, lists, tables, code, HTML blocks, and live choice sets remain intact. Choices appear last. Readers can click or tap the story area, or press Space, Enter, or Escape, to reveal everything immediately. Reduced-motion and replayed history are immediate. This is presentation only: scripts and story state finish before reveal begins, and no author syntax is required.
+
 ## 14. Diagnostics and analyzer rules
 
 Run:

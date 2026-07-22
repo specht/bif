@@ -210,6 +210,29 @@ button.pagelink {
     opacity: 0.65;
 }
 
+.story-reveal-prose-group {
+    display: inline;
+}
+
+[data-reveal-state="pending"] {
+    opacity: 0;
+    transform: translateY(0.25rem);
+}
+
+[data-reveal-state="visible"] {
+    opacity: 1;
+    transform: none;
+    transition: opacity 180ms ease-out, transform 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-reveal-state] {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
+}
+
 #content {
     padding-bottom: 15px;
 }
