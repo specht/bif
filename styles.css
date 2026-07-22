@@ -270,7 +270,7 @@ body.dev {
                 display: flex;
 
                 #graph-panel {
-                    --authoring-ui-font-size: 0.78rem;
+                    --authoring-ui-font-size: 0.85rem;
                     --authoring-ui-line-height: 1.35;
                     min-width: 0;
                     min-height: 0;
