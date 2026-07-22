@@ -79,6 +79,18 @@ test("Assigning to rvalue publishes a semantic message and structured local coor
   assert.doesNotMatch(item.message, /Script 1|\(2:21\)/);
 });
 
+test("bork parser failure publishes only its semantic message at the page-level location", async () => {
+  const result = await analyzeStory(fixture("bork-script"));
+  const item = result.diagnostics.find(diagnostic => diagnostic.code === "script-syntax");
+  assert.equal(item.message, "Unexpected token");
+  assert.equal(item.file, "pages/1.md");
+  assert.equal(item.line, 21);
+  assert.equal(item.scriptIndex, 1);
+  assert.equal(item.scriptLine, 3);
+  assert.equal(item.scriptColumn, 9);
+  assert.doesNotMatch(item.message, /Script 1|\(3:9\)/);
+});
+
 test("local image existence, traversal, and missing alt text are checked", async () => {
   const result = await analyzeStory(fixture("missing-image"));
   assert.ok(result.diagnostics.some((item) => item.code === "missing-image" && item.message.includes("assets/missing.png")));

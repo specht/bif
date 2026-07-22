@@ -34,26 +34,37 @@ Summary counters and a docked, collapsible **Problems (N) | State** inspector
 expose analyzer diagnostics and runtime state without covering the graph or
 changing the story session.
 
-The compact summary always shows the story-derived title, page count, and choice
-count, while omitting zero-valued problem metrics; a clean project is marked
+The compact single-line authoring toolbar shows the story-derived title first,
+then page count, choice count, and status, with restart aligned at the right. It
+wraps without dropping the title on narrow screens and uses one shared chrome
+font size and line height. Zero-valued problem metrics are omitted; a clean project is marked
 with a green Tabler check icon while the words `No problems` retain the normal
-summary color. Problems are grouped by relative source file and
-sorted by source position. Their messages and locations wrap within the panel.
+summary color. Problems form one flat, globally source-sorted list with a
+severity icon, relative path, and semantic message on every item. Their messages and locations wrap within the panel.
 Each problem immediately shows a compact highlighted source excerpt with line
 numbers and a translucent range marker. Empty outer context lines are trimmed
 without removing internal blank lines or changing source line numbers. Each source file is fetched only once
 per analysis hash, and only unusually long source lines scroll horizontally.
-The file path appears once in its group header. Located messages use the
+Located messages use the
 page-level form `(line N)` instead of embedded-parser coordinates. The inspector opens and closes with a short transition,
 disabled when reduced motion is requested, and its horizontal separator can be
 dragged or adjusted with Arrow keys (Shift uses larger steps). In development
 mode the restart control lives in the top toolbar instead of covering the
 inspector. Problems do not open an external editor or protocol; selecting one
 selects its associated graph item. Shared icon-and-text controls use consistent
-center alignment. Use the visible relative path and line with the editor's file
+center alignment. Problems and State use a connected ARIA tab strip, and the
+Collapse/Expand control uses the shared chevron icons. Use the visible relative path and line with the editor's file
 and line navigation when source editing is needed. Pointer graph navigation
 does not move focus to a passage or show its keyboard-only outline; keyboard
 graph and transcript navigation retain a visible passage focus indicator.
+
+Graph navigation uses one SVG `viewBox` model: wheel/trackpad zoom remains
+anchored below the pointer, pointer drag pans, and touch supports one-finger pan
+and midpoint-anchored two-finger pinch. The graph toolbar provides **Fit graph**
+and a persisted, initially-off **Auto-follow** toggle. Follow uses a short
+cancelable transition to keep story progress comfortably visible; Fit or any
+manual pan/zoom disables it. Programmatic movement is immediate when reduced
+motion is requested.
 
 The BIF VS Code extension generates the snapshot after analysis. Without the
 extension, run `npm run analysis -- --watch` while editing. After loading or
@@ -79,16 +90,13 @@ the meaningful browser model (title, counts, graph structure, locations, and
 diagnostics) and drives refresh/rerender decisions. Older snapshots without an
 `analysisHash` use a stable fingerprint until a current snapshot arrives.
 
-In development mode the header uses a title/action row and a separate wrapping
-counts/status row. Only nonzero problem counts are shown; a clean analysis shows
-a green check icon with neutral `No problems` text.
-
 Passage processing is fail-stop. Executable fragments are syntax-preflighted,
 then rendered into detached staging output against a snapshot of story state.
 Success commits state, passage DOM, history, and choices once. The first script,
 expression, or condition failure discards the staged passage, restores state,
-and leaves the previous transcript usable. Development mode gives a concise
-relative file/line notice and keeps details in Problems; game mode shows only
+and leaves the previous transcript usable. Development mode gives the generic
+notice `This passage could not be completed. See Problems below for details.`
+and keeps authoritative locations in Problems; game mode shows only
 `This part of the story could not be loaded.` and does not fetch analysis for it.
 Application bootstrap failures remain fatal when mandatory configuration cannot
 be loaded. Passage failures are recoverable after the shell is initialized: a

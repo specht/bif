@@ -396,15 +396,14 @@ async function openErrorFixture(page) {
   await expect(page.getByRole('heading', { name: 'Story error fixture' })).toBeVisible();
 }
 
-test('a genuine missing page is reported as missing', async ({ page }) => {
+test('a genuine missing page uses the generic development failure notice', async ({ page }) => {
   const pageErrors = collectPageErrors(page);
   await openErrorFixture(page);
   await page.locator('.pagelink', { hasText: 'Open a missing page' }).click();
 
   const error = page.locator('.story-error');
-  await expect(error).toContainText(/Missing page/i);
-  await expect(error).toContainText(/99|test-fixtures\/story-errors\/99\.md/);
-  await expect(error).not.toContainText(/Condition error|Expression error|Script error/i);
+  await expect(error).toHaveText('This passage could not be completed.See Problems below for details.');
+  await expect(error).not.toContainText(/Missing page|99|test-fixtures|Condition error|Expression error|Script error/i);
   expect(pageErrors).toEqual([]);
 });
 
@@ -419,9 +418,8 @@ test('a synchronous script failure has page context and is not reported as missi
   await expect(page.locator('#state-container')).toContainText('original');
   await expect(page.locator('#state-container')).not.toContainText('mutated');
   const error = page.locator('.story-error');
-  await expect(error).toContainText('This passage could not be completed.');
-  await expect(error).toContainText('test-fixtures/story-errors/2.md');
-  await expect(error).toContainText(/line \d+/);
+  await expect(error).toHaveText('This passage could not be completed.See Problems below for details.');
+  await expect(error).not.toContainText(/test-fixtures|line \d+/);
   await expect(error).not.toContainText('synchronous fixture failure');
   await expect(page.getByText(/page .*not found|Seite .*nicht gefunden/i)).toHaveCount(0);
   expect(pageErrors).toEqual([]);
@@ -433,8 +431,8 @@ test('a script syntax error is distinguished from a missing page', async ({ page
   await page.locator('.pagelink', { hasText: 'Open the syntax-error page' }).click();
 
   const error = page.locator('.story-error');
-  await expect(error).toContainText('This passage could not be completed.');
-  await expect(error).toContainText('test-fixtures/story-errors/3.md');
+  await expect(error).toHaveText('This passage could not be completed.See Problems below for details.');
+  await expect(error).not.toContainText(/test-fixtures|line \d+/);
   await expect(error).not.toContainText(/Unexpected token|SyntaxError/i);
   await expect(page.locator('#state-container')).toContainText('original');
   await expect(page.locator('#state-container')).not.toContainText('mutated');
@@ -462,11 +460,10 @@ test('a broken condition atomically discards the passage and later content', asy
   await expect(page.getByText('Valid false content must stay hidden.')).toHaveCount(0);
   await expect(page.getByText('Content after the broken condition.')).toHaveCount(0);
   const error = page.locator('.story-error');
-  await expect(error).toContainText('This passage could not be completed.');
+  await expect(error).toHaveText('This passage could not be completed.See Problems below for details.');
   await expect(error).not.toContainText('missingCondition.value');
   await expect(error).not.toContainText(/undefined|null|ReferenceError|TypeError/i);
-  await expect(error).toContainText('test-fixtures/story-errors/4.md');
-  await expect(error).toContainText(/line \d+/);
+  await expect(error).not.toContainText(/test-fixtures|line \d+/);
   expect(pageErrors).toEqual([]);
 });
 
@@ -478,15 +475,14 @@ test('a broken inline expression atomically discards earlier and later output', 
   await expect(page.getByText('Valid expression result: 5')).toHaveCount(0);
   await expect(page.getByText('Content after the broken expression.')).toHaveCount(0);
   const error = page.locator('.story-error');
-  await expect(error).toContainText('This passage could not be completed.');
+  await expect(error).toHaveText('This passage could not be completed.See Problems below for details.');
   await expect(error).not.toContainText('missingInventory.key.name');
-  await expect(error).toContainText('test-fixtures/story-errors/5.md');
-  await expect(error).toContainText(/line \d+/);
+  await expect(error).not.toContainText(/test-fixtures|line \d+/);
   await expect(page.getByText(/page .*not found|Seite .*nicht gefunden/i)).toHaveCount(0);
   expect(pageErrors).toEqual([]);
 });
 
-test('an asynchronous script rejection retains page context', async ({ page }) => {
+test('an asynchronous script rejection uses the generic development notice', async ({ page }) => {
   const pageErrors = collectPageErrors(page);
   await openErrorFixture(page);
   await page.locator('.pagelink', { hasText: 'Open the async-error page' }).click();
@@ -494,8 +490,8 @@ test('an asynchronous script rejection retains page context', async ({ page }) =
   await page.getByRole('button', { name: 'Continue the failing script' }).click();
 
   const error = page.locator('.story-error');
-  await expect(error).toContainText('This passage could not be completed.');
-  await expect(error).toContainText('test-fixtures/story-errors/6.md');
+  await expect(error).toHaveText('This passage could not be completed.See Problems below for details.');
+  await expect(error).not.toContainText(/test-fixtures|line \d+/);
   await expect(error).not.toContainText('asynchronous fixture failure');
   await expect(page.getByRole('heading', { name: 'Valid destination' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Async-error passage' })).toHaveCount(0);

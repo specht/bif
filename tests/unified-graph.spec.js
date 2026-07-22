@@ -65,7 +65,7 @@ test('broken entry passage keeps the complete development shell alive across rel
   await expect(page).toHaveTitle('Broken entry fixture');
   await expect(page.locator('.development-title-row')).toBeVisible();
   await expect(page.locator('.development-title-row #bu_reset_game')).toBeVisible();
-  await expect(page.locator('#project-analysis-status')).toBeVisible();
+  await expect(page.locator('#project-analysis-summary')).toContainText('Broken entry fixture');
   await expect(page.locator('#graph-container')).toBeVisible();
   await expect(page.locator('#graph-container svg')).toHaveCount(1);
   await expect(page.locator('#development-inspector')).toBeVisible();
@@ -74,7 +74,7 @@ test('broken entry passage keeps the complete development shell alive across rel
   await expect(page.locator('.problem-message')).toContainText('Assigning to rvalue (line 8)');
   await expect(page.locator('.problem-source-host')).toContainText('crew_count = 12;     1 = 2;');
   await expect(page.locator('#content .story-error')).toHaveCount(1);
-  await expect(page.locator('#content .story-error')).toContainText('There is a script error in test-fixtures/broken-entry/pages/1.md on line 8.');
+  await expect(page.locator('#content .story-error')).toHaveText('This passage could not be completed.See Problems below for details.');
   await expect(page.locator('#content')).not.toContainText(/later prose|Forbidden later choice|Assigning to rvalue|SyntaxError|ReferenceError|\(2:21\)/);
   await expect(page.locator('#content .story-passage')).toHaveCount(0);
   await expect(page.locator('nav > #bu_reset_game')).toHaveCount(0);
@@ -149,7 +149,7 @@ test('one graph shows complete structure and contextual Problems', async ({ page
   await expect(page.locator('#project-problems')).toBeVisible();
   await expect(page.locator('.project-problem.selected')).toContainText('missing page');
   await expect(page.locator('.project-problem')).toHaveCount(complete.diagnostics.length);
-  await expect(page.locator('.problem-file-name').filter({ hasText: 'pages/1.md' })).toHaveCount(1);
+  await expect(page.locator('.problem-path').filter({ hasText: 'pages/1.md' })).not.toHaveCount(0);
   await expect(page.locator('#project-problems')).not.toContainText(process.cwd());
   const before = await snapshot(page);
   await page.locator('.project-problem', { hasText: 'missing page' }).click();
@@ -159,7 +159,7 @@ test('one graph shows complete structure and contextual Problems', async ({ page
   expect(after.focus).toContain('missing page');
 });
 
-test('summary hides zero metrics and Problems group, sort, and wrap by file', async ({ page }) => {
+test('summary hides zero metrics and Problems sort and wrap as a flat list', async ({ page }) => {
   const clean = {
     ...complete,
     contentHash: 'c'.repeat(64),
@@ -173,14 +173,15 @@ test('summary hides zero metrics and Problems group, sort, and wrap by file', as
   const summary = page.locator('#project-analysis-counts');
   await expect(page.locator('.development-title-row')).toContainText('Start of the authoring map');
   await expect(page.locator('.development-title-row')).toContainText('Spiel neu starten');
-  await expect(summary).not.toContainText('Start of the authoring map');
+  await expect(page.locator('.development-summary-items').first()).toContainText('Start of the authoring map');
   await expect(summary).toContainText('No problems');
   for (const metric of ['errors', 'warnings', 'unreachable', 'missing']) await expect(page.locator(`.project-analysis-${metric}`)).toBeHidden();
 
   publication = complete;
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(page.getByRole('tab', { name: `Problems (${complete.diagnostics.length})` })).toBeVisible();
-  const files = await page.locator('.problem-file-name').allTextContents();
+  await expect(page.locator('.problem-file-group, .problem-file-header')).toHaveCount(0);
+  const files = await page.locator('.problem-path').allTextContents();
   expect(files).toEqual([...files].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })));
   const locations = await page.locator('.problem-location').allTextContents();
   expect(locations.every(location => !location.includes(process.cwd()))).toBe(true);
@@ -199,9 +200,9 @@ test('Problems formats semantic diagnostics with page-level lines', async ({ pag
   await expect(row).toContainText('Assigning to rvalue (line 16)');
   await expect(row).not.toContainText('(2:21)');
   await expect(row).not.toContainText('Script 1');
-  await expect(row).not.toContainText('pages/1.md');
+  await expect(row.locator('.problem-path')).toHaveText('pages/1.md');
   await expect(row).toHaveAttribute('title', 'pages/1.md, line 16, column 21: Assigning to rvalue');
-  await expect(page.locator('.problem-file-group', { hasText: 'pages/1.md' })).toContainText('pages/1.md');
+  await expect(page.locator('.problem-file-group, .problem-file-header')).toHaveCount(0);
   await expect(page.locator('.project-problem', { hasText: 'Meaningful (context)' })).not.toContainText('(line undefined)');
   await expect(page.locator('.problem-location')).toHaveCount(0);
 });
@@ -238,18 +239,19 @@ test('problem source is immediate, cached per file, marked, highlighted, and saf
 test('Problems rows have no editor action column and never overflow', async ({ page }) => {
   await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => complete);
   await page.goto('/?dev');
-  const item = page.locator('.problem-file-rows > li').first();
+  const item = page.locator('.problem-item').first();
   await expect(item.locator('.problem-open-source')).toHaveCount(0);
 
   for (const width of [1280, 760]) {
     await page.setViewportSize({ width, height: 720 });
     const geometry = await item.evaluate(element => {
       const rectangle = selector => element.querySelector(selector).getBoundingClientRect().toJSON();
-      const heading = element.querySelector('.problem-row-heading');
+      const heading = element.querySelector('.project-problem');
       const panel = document.querySelector('#project-problems');
       return { columns: getComputedStyle(heading).gridTemplateColumns.split(' ').length, overflow: panel.scrollWidth > panel.clientWidth };
     });
-    expect(geometry).toEqual({ columns: 1, overflow: false });
+    expect(geometry.overflow).toBe(false);
+    expect(geometry.columns).toBe(3);
   }
 
   await item.locator('.project-problem').click();
@@ -261,7 +263,7 @@ test('shared icons align with labels and clean text remains neutral', async ({ p
   await page.goto('/?dev');
   await expect(page.locator('.project-analysis-errors')).toBeVisible();
   const aligned = await page.evaluate(() => {
-    const selectors = ['.project-analysis-errors', '.problem-severity'];
+    const selectors = ['.project-analysis-errors', '.development-inspector-collapse'];
     return selectors.map(selector => {
       const pair = document.querySelector(selector);
       const icon = pair.querySelector('.icon').getBoundingClientRect();
@@ -284,6 +286,90 @@ test('shared icons align with labels and clean text remains neutral', async ({ p
   expect(colors.text).toBe(colors.normal);
   expect(colors.wrapper).toBe(colors.normal);
   expect(colors.icon).not.toBe(colors.normal);
+});
+
+test('authoring toolbar is compact, title-first, responsive, and typographically uniform', async ({ page }) => {
+  await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => complete);
+  await page.goto('/?dev');
+  await expect(page.locator('.problem-source-text').first()).toBeVisible();
+  const desktop = await page.evaluate(() => {
+    const row = document.querySelector('.development-title-row').getBoundingClientRect();
+    const title = document.querySelector('.project-analysis-title').getBoundingClientRect();
+    const restart = document.querySelector('#bu_reset_game').getBoundingClientRect();
+    const selectors = ['.project-analysis-title', '.project-analysis-pages', '#bu_reset_game', '#problems-tab', '.development-inspector-collapse', '.project-problem', '.problem-source-text'];
+    return {
+      row: row.toJSON(), title: title.toJSON(), restart: restart.toJSON(),
+      fonts: selectors.map(selector => getComputedStyle(document.querySelector(selector)).fontSize),
+      lines: selectors.slice(0, -1).map(selector => getComputedStyle(document.querySelector(selector)).lineHeight),
+    };
+  });
+  expect(desktop.title.left).toBeLessThan(desktop.restart.left);
+  expect(Math.abs(desktop.title.top - desktop.restart.top)).toBeLessThan(8);
+  expect(desktop.row.height).toBeLessThan(38);
+  expect(new Set(desktop.fonts).size).toBe(1);
+  expect(new Set(desktop.lines).size).toBe(1);
+
+  await page.setViewportSize({ width: 620, height: 720 });
+  const narrow = await page.evaluate(() => ({
+    title: document.querySelector('.project-analysis-title').getBoundingClientRect().width,
+    restart: document.querySelector('#bu_reset_game').getBoundingClientRect().width,
+    overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  }));
+  expect(narrow.title).toBeGreaterThan(0);
+  expect(narrow.restart).toBeGreaterThan(0);
+  expect(narrow.overflow).toBe(false);
+});
+
+test('graph wheel, pointer and touch gestures update one persistent viewport and disable follow', async ({ page }) => {
+  await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => complete);
+  await page.goto('/?dev');
+  const svg = page.locator('#graph-container svg');
+  const autoFollow = page.getByRole('button', { name: 'Auto-follow' });
+  await autoFollow.click();
+  await expect(autoFollow).toHaveAttribute('aria-pressed', 'true');
+  const original = await svg.getAttribute('viewBox');
+  const box = await svg.boundingBox();
+  await svg.dispatchEvent('wheel', { deltaY: -90, clientX: box.x + 40, clientY: box.y + 40 });
+  await expect.poll(() => svg.getAttribute('viewBox')).not.toBe(original);
+  await expect(autoFollow).toHaveAttribute('aria-pressed', 'false');
+
+  const afterWheel = await svg.getAttribute('viewBox');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 35, box.y + box.height / 2 + 20);
+  await page.mouse.up();
+  await expect.poll(() => svg.getAttribute('viewBox')).not.toBe(afterWheel);
+
+  const touchResult = await svg.evaluate(element => {
+    const fire = (type, pointerId, x, y) => element.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId, pointerType: 'touch', isPrimary: pointerId === 11, button: 0, clientX: x, clientY: y }));
+    const before = element.getAttribute('viewBox');
+    const capture = element.setPointerCapture;
+    const release = element.releasePointerCapture;
+    const has = element.hasPointerCapture;
+    element.setPointerCapture = () => {};
+    element.releasePointerCapture = () => {};
+    element.hasPointerCapture = () => false;
+    const rect = element.getBoundingClientRect();
+    fire('pointerdown', 11, rect.left + 120, rect.top + 120);
+    fire('pointerdown', 12, rect.left + 220, rect.top + 120);
+    fire('pointermove', 11, rect.left + 95, rect.top + 135);
+    fire('pointermove', 12, rect.left + 255, rect.top + 145);
+    fire('pointercancel', 11, rect.left + 95, rect.top + 135);
+    fire('pointerup', 12, rect.left + 255, rect.top + 145);
+    element.setPointerCapture = capture;
+    element.releasePointerCapture = release;
+    element.hasPointerCapture = has;
+    return { before, after: element.getAttribute('viewBox'), touchAction: getComputedStyle(element).touchAction };
+  });
+  expect(touchResult.after).not.toBe(touchResult.before);
+  expect(touchResult.touchAction).toBe('none');
+  await expect(page.locator('#graph-container svg')).toHaveCount(1);
+
+  await autoFollow.click();
+  await expect(autoFollow).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Fit graph' }).click();
+  await expect(autoFollow).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('#graph-container svg')).toHaveCount(1);
 });
 
 test('docked Problems and State inspector preserves graph and story behavior', async ({ page }) => {
@@ -351,6 +437,14 @@ test('resizable inspector and development UI state survive reload without rebuil
   await expect.poll(() => inspector.evaluate((element, expected) => Math.abs(element.getBoundingClientRect().height - expected), resizedHeight)).toBeLessThan(7);
   await expect(page.locator('#graph-container svg')).toHaveAttribute('viewBox', savedViewBox);
   await expect(page.locator('#graph-container svg')).toHaveCount(1);
+  const follow = page.getByRole('button', { name: 'Auto-follow' });
+  await follow.click();
+  await expect(follow).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(350);
+  const followedViewBox = await page.locator('#graph-container svg').getAttribute('viewBox');
+  await page.reload();
+  await expect(follow).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#graph-container svg')).toHaveAttribute('viewBox', followedViewBox);
   const storage = await page.evaluate(() => Object.values(sessionStorage).join('\n'));
   expect(storage).not.toContain(process.cwd());
   expect(storage).not.toContain('crew_count');

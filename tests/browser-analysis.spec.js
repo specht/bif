@@ -687,6 +687,10 @@ test('summary is keyboard accessible and reduced-motion safe', async ({ page }) 
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Spiel neu starten' })).toBeFocused();
   await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Fit graph' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Auto-follow' })).toBeFocused();
+  await page.keyboard.press('Tab');
   await expect(page.getByRole('separator', { name: 'Resize development inspector' })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(stateTab).toBeFocused();
@@ -697,4 +701,31 @@ test('summary is keyboard accessible and reduced-motion safe', async ({ page }) 
   }));
   expect(styles.transition).toBe('0s');
   expect(styles.outline).not.toBe('none');
+});
+
+test('graph viewport math keeps wheel and pinch focal points anchored', async ({ page }) => {
+  await page.goto('/?mode=game');
+  const result = await page.evaluate(async () => {
+    const viewport = await import(`/lib/browser-graph-viewport.js?math=${Date.now()}`);
+    const box = { left: 100, top: 50, width: 800, height: 400 };
+    const start = { x: -200, y: 20, width: 1600, height: 800 };
+    const point = { x: 260, y: 170 };
+    const before = viewport.clientPointToWorld(start, box, point);
+    const zoomed = viewport.zoomViewBoxAt(start, box, point, 0.6, { minWidth: 200, maxWidth: 4000 });
+    const after = viewport.clientPointToWorld(zoomed, box, point);
+    const restored = viewport.zoomViewBoxAt(zoomed, box, point, 1 / 0.6, { minWidth: 200, maxWidth: 4000 });
+    const pinch = viewport.pinchViewBox(start, box,
+      { midpoint: { x: 300, y: 200 }, distance: 100 },
+      { midpoint: { x: 340, y: 225 }, distance: 160 },
+      { minWidth: 200, maxWidth: 4000 });
+    const oldPinchWorld = viewport.clientPointToWorld(start, box, { x: 300, y: 200 });
+    const newPinchWorld = viewport.clientPointToWorld(pinch, box, { x: 340, y: 225 });
+    return { before, after, restored, start, pinch, oldPinchWorld, newPinchWorld };
+  });
+  expect(result.after.x).toBeCloseTo(result.before.x, 8);
+  expect(result.after.y).toBeCloseTo(result.before.y, 8);
+  for (const key of ['x', 'y', 'width', 'height']) expect(result.restored[key]).toBeCloseTo(result.start[key], 8);
+  expect(result.pinch.width).toBeLessThan(result.start.width);
+  expect(result.newPinchWorld.x).toBeCloseTo(result.oldPinchWorld.x, 8);
+  expect(result.newPinchWorld.y).toBeCloseTo(result.oldPinchWorld.y, 8);
 });
