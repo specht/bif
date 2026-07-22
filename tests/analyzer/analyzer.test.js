@@ -38,6 +38,23 @@ test("missing destinations and unreachable pages are diagnosed", async () => {
   assert.equal(strict.diagnostics.find((item) => item.code === "unreachable-page")?.severity, "warning");
 });
 
+test("a missing configured story directory points to its config.js literal", async () => {
+  const result = await analyzeStory(fixture("missing-pages-path"));
+  const item = result.diagnostics.find((diagnostic) => diagnostic.code === "pages-path-missing");
+  assert.deepEqual(item, {
+    severity: "error",
+    code: "pages-path-missing",
+    file: "config.js",
+    line: 1,
+    column: 21,
+    endLine: 1,
+    endColumn: 46,
+    message: "Configured story directory does not exist: pages-that-do-not-exist",
+  });
+  assert.equal(result.summary.errors, 1);
+  assert.equal(result.summary.pages, 0);
+});
+
 test("real JavaScript parsing reports scripts, conditions, and expressions independently", async () => {
   const result = await analyzeStory(fixture("invalid-syntax"));
   const codes = result.diagnostics.map((item) => item.code);
@@ -113,8 +130,14 @@ test("case-insensitive page ID collisions are diagnosed", async () => {
 
 test("the active story can be analyzed without executing story code", async () => {
   const result = await analyzeStory(repository);
-  assert.equal(result.summary.pages, 13);
-  assert.equal(result.summary.errors, 0);
+  const missingPath = result.diagnostics.find((item) => item.code === "pages-path-missing");
+  if (missingPath) {
+    assert.equal(missingPath.file, "config.js");
+    assert.match(missingPath.message, /^Configured story directory does not exist:/);
+  } else {
+    assert.equal(result.summary.pages, 13);
+    assert.equal(result.summary.errors, 0);
+  }
 });
 
 test("CLI JSON is machine-readable and failures set a nonzero exit status", () => {

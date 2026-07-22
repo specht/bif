@@ -238,6 +238,28 @@ test('Problems formats semantic diagnostics with page-level lines', async ({ pag
   });
 });
 
+test('a missing configured story path shows its config.js source in Problems', async ({ page }) => {
+  const configSource = 'export const path = "pages-that-do-not-exist";';
+  const analysis = await analyzeStory(path.join(process.cwd(), 'test-fixtures/analyzer/missing-pages-path'));
+  const publication = buildBrowserAnalysisPublication(analysis);
+  await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => publication);
+  await page.route(/\/config\.js$/, route => route.fulfill({ contentType: 'text/javascript', body: configSource }));
+  await page.goto('/?dev');
+  const problem = page.locator('.project-problem', { hasText: 'Configured story directory does not exist' });
+  await expect(problem).toContainText('config.js');
+  await expect(problem).toContainText('pages-that-do-not-exist');
+  await expect(problem).toContainText('(line 1)');
+  const snippet = page.locator('.problem-source-snippet');
+  await expect(snippet).toContainText(configSource);
+  await expect(snippet.locator('.problem-source-diagnostic-line')).toHaveCount(1);
+  const marker = snippet.locator('.problem-source-range.exact');
+  await expect(marker).toHaveCount(1);
+  expect(await marker.evaluate(element => ({
+    column: element.style.getPropertyValue('--marker-column'),
+    width: element.style.getPropertyValue('--marker-width'),
+  }))).toEqual({ column: '21', width: '25' });
+});
+
 test('real bork publication and browser output keep parser-local context internal', async ({ page }) => {
   const root = path.join(process.cwd(), 'test-fixtures/analyzer/bork-script-page4');
   const publication = buildBrowserAnalysisPublication(await analyzeStory(root));

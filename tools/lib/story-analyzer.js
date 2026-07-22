@@ -35,10 +35,11 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
   }
 
   const pagesDirectory = path.resolve(root, config.pagesPath);
+  const pagesPathLocation = config.pagesPathLocation || { line: 1, column: 1 };
   for (const message of config.migrationWarnings || []) diagnostics.push(diagnostic("warning", "config-migration", "config.js", 1, 1, message));
   let storyTitle = FALLBACK_TITLE;
   if (!pagesDirectory.startsWith(`${root}${path.sep}`) && pagesDirectory !== root) {
-    diagnostics.push(diagnostic("error", "pages-path-outside-project", "config.js", 1, 1, `Configured story path escapes the project: ${config.pagesPath}`));
+    diagnostics.push(diagnostic("error", "pages-path-outside-project", "config.js", pagesPathLocation.line, pagesPathLocation.column, `Configured story path escapes the project: ${config.pagesPath}`, pagesPathLocation));
     return finish(root, { ...config, title: FALLBACK_TITLE, startPage: "1" }, [], [], diagnostics, 0, sourceEntries);
   }
 
@@ -49,7 +50,12 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
       .map((entry) => entry.name)
       .sort(collator.compare);
   } catch (error) {
-    diagnostics.push(diagnostic("error", "pages-path-missing", relative(root, pagesDirectory), 1, 1, `Cannot read configured story directory: ${error.message}`));
+    const message = error?.code === "ENOENT"
+      ? `Configured story directory does not exist: ${config.pagesPath}`
+      : error?.code === "ENOTDIR"
+        ? `Configured story path is not a directory: ${config.pagesPath}`
+        : `Cannot read configured story directory '${config.pagesPath}': ${error.message}`;
+    diagnostics.push(diagnostic("error", "pages-path-missing", "config.js", pagesPathLocation.line, pagesPathLocation.column, message, pagesPathLocation));
     return finish(root, { ...config, title: FALLBACK_TITLE, startPage: "1" }, [], [], diagnostics, 0, sourceEntries);
   }
 

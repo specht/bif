@@ -1,0 +1,20 @@
+{
+  "pages": 38,
+  "choices": 143,
+  "local_choices": 42,
+  "page_choices": 101,
+  "groups": [
+    "Aussichtswagen",
+    "Dienstwagen",
+    "Ende",
+    "Fahrgäste",
+    "Gepäckwagen",
+    "Lokomotive",
+    "Schlafwagen",
+    "Speisewagen",
+    "Zug"
+  ],
+  "missing_targets": [],
+  "script_open": 49,
+  "script_close": 49
+}

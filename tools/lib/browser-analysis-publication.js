@@ -13,7 +13,7 @@ function sanitizeDiagnostic(item) {
   };
   if (item.target !== undefined) result.target = item.target;
   if (item.choiceId !== undefined) result.choiceId = item.choiceId;
-  for (const field of ["scriptIndex", "scriptLine", "scriptColumn", "expressionLine", "expressionColumn", "rawMessage", "kind"]) {
+  for (const field of ["endLine", "endColumn", "scriptIndex", "scriptLine", "scriptColumn", "expressionLine", "expressionColumn", "rawMessage", "kind"]) {
     if (item[field] !== undefined) result[field] = item[field];
   }
   return result;

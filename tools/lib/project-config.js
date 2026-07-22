@@ -11,6 +11,7 @@ async function readProjectConfig(projectRoot) {
     locations: true,
   });
   const values = {};
+  const locations = {};
 
   for (const statement of program.body) {
     const declaration = statement.type === "ExportNamedDeclaration"
@@ -25,6 +26,12 @@ async function readProjectConfig(projectRoot) {
         typeof item.init.value === "string"
       ) {
         values[item.id.name] = item.init.value;
+        locations[item.id.name] = {
+          line: item.init.loc.start.line,
+          column: item.init.loc.start.column + 1,
+          endLine: item.init.loc.end.line,
+          endColumn: item.init.loc.end.column + 1,
+        };
       }
     }
   }
@@ -36,6 +43,7 @@ async function readProjectConfig(projectRoot) {
   }
   return {
     pagesPath: values.path,
+    pagesPathLocation: locations.path,
     migrationWarnings: [
       values.title && "config.js title is ignored; add title metadata or an H1 to the selected story's 1.md.",
       values.startPage && "config.js startPage is ignored; stories always begin at 1.md.",
