@@ -89,8 +89,8 @@ test("CLI writes graphs on success and analyzer error with matching exit codes",
   const html = fs.readFileSync(brokenOutput, "utf8"); assert.match(html, /node-missing-/); assert.match(html, /missing-page/);
 });
 
-test("active story graph matches its analyzer baseline", async () => {
-  const analysis = await analyzeStory(repository);
+test("fixture story graph matches its analyzer baseline", async () => {
+  const analysis = await analyzeStory(path.join(repository, "test-fixtures/analyzer/valid"));
   const model = buildAuthoringGraph(analysis);
   assert.equal(model.summary.pages, analysis.summary.pages);
   assert.equal(model.summary.edges, analysis.summary.links);

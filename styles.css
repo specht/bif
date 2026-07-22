@@ -148,14 +148,13 @@ button.pagelink {
     margin-block: var(--turn-to-live-set-gap) 0;
 }
 
-.live-choice-set > li,
-.committed-choice-turn li {
+.live-choice-set > li {
     list-style: none;
     margin: 0;
 }
 
 .live-choice-set > li > .story-choice,
-.committed-choice-turn .story-choice {
+.committed-choice-turn > .story-choice {
     box-sizing: border-box;
     color: inherit;
     display: block;
@@ -191,6 +190,12 @@ button.pagelink {
     background-color: var(--bg-color);
     border-color: var(--mix-70);
     box-shadow: 0 0.05em 0.15em rgba(0, 0, 0, 0.1);
+}
+
+.story-choice.committed-choice.chosen {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.01);
 }
 
 .choice-result {

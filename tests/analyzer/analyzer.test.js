@@ -128,16 +128,10 @@ test("case-insensitive page ID collisions are diagnosed", async () => {
   assert.ok(result.diagnostics.some((item) => item.code === "ambiguous-target"));
 });
 
-test("the active story can be analyzed without executing story code", async () => {
-  const result = await analyzeStory(repository);
-  const missingPath = result.diagnostics.find((item) => item.code === "pages-path-missing");
-  if (missingPath) {
-    assert.equal(missingPath.file, "config.js");
-    assert.match(missingPath.message, /^Configured story directory does not exist:/);
-  } else {
-    assert.equal(result.summary.pages, 13);
-    assert.equal(result.summary.errors, 0);
-  }
+test("a fixture story can be analyzed without executing story code", async () => {
+  const result = await analyzeStory(fixture("valid"));
+  assert.equal(result.summary.pages, 2);
+  assert.equal(result.summary.errors, 0);
 });
 
 test("CLI JSON is machine-readable and failures set a nonzero exit status", () => {

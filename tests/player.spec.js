@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import storyAnalyzer from '../tools/lib/story-analyzer.js';
+import publicationTools from '../tools/lib/browser-analysis-publication.js';
+
+const { analyzeStory } = storyAnalyzer;
+const { buildBrowserAnalysisPublication } = publicationTools;
 
 function collectPageErrors(page) {
   const errors = [];
@@ -8,11 +13,38 @@ function collectPageErrors(page) {
   return errors;
 }
 
-async function useFixture(page, title, path) {
-  await page.route(/\/config\.js\?.*/, route => route.fulfill({
+async function useFixture(page, title, storyPath) {
+  await page.route(/\/config\.js(?:\?.*)?$/, route => route.fulfill({
     contentType: 'text/javascript',
-    body: `export const path = ${JSON.stringify(path)};`,
+    body: `export const path = ${JSON.stringify(storyPath)};`,
   }));
+  await page.route(/\/\.story-tools\/analysis\.json(?:\?.*)?$/, async route => {
+    const projectPath = storyPath.endsWith('/pages') ? path.dirname(storyPath) : storyPath;
+    try {
+      const analysis = buildBrowserAnalysisPublication(await analyzeStory(path.join(process.cwd(), projectPath)));
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify(analysis) });
+    } catch {
+      await route.fulfill({ status: 404, body: 'No fixture analysis' });
+    }
+  });
+}
+
+async function finishStoryReveal(page) {
+  const pending = page.locator('[data-reveal-state="pending"]');
+  if (await pending.count()) {
+    await page.locator('#game_pane').click({ position: { x: 8, y: 8 } });
+    await expect(pending).toHaveCount(0);
+  }
+}
+
+async function chooseStoryOption(page, name) {
+  await finishStoryReveal(page);
+  const control = page.getByRole('link', { name, exact: true })
+    .or(page.getByRole('button', { name, exact: true }));
+  await expect(control).toBeVisible();
+  await expect(control).not.toHaveAttribute('aria-hidden', 'true');
+  await expect.poll(() => control.evaluate(element => !element.closest('[inert], [aria-hidden="true"]'))).toBe(true);
+  await control.click();
 }
 
 async function useScrollFixture(page, { normalMode = false } = {}) {
@@ -57,13 +89,11 @@ async function passageIsVisible(page, pageId) {
 
 test('initial page renders', async ({ page }) => {
   const pageErrors = collectPageErrors(page);
-
+  await useFixture(page, 'Player fixture', 'test-fixtures/player-basic/pages');
   await page.goto('/');
 
-  await expect(page).toHaveTitle('Die List des Odysseus');
-  await expect(page.locator('#content')).not.toContainText('title: Die List des Odysseus');
-  await expect(page.getByText('Du bist Odysseus', { exact: false })).toBeVisible();
-  await expect(page.getByText('Du gehst mit', { exact: false })).toBeVisible();
+  await expect(page).toHaveTitle('Player fixture');
+  await expect(page.getByText('The fixture story begins here.')).toBeVisible();
   await expect(page.locator('.pagelink')).not.toHaveCount(0);
   expect(pageErrors).toEqual([]);
 });
@@ -92,7 +122,7 @@ test('a broken entry passage remains a recoverable game-mode failure', async ({ 
 });
 
 test('invalid mandatory configuration still uses the fatal application fallback', async ({ page }) => {
-  await page.route(/\/config\.js\?.*/, route => route.fulfill({
+  await page.route(/\/config\.js(?:\?.*)?$/, route => route.fulfill({
     contentType: 'text/javascript',
     body: 'throw new Error("invalid fixture configuration");',
   }));
@@ -103,32 +133,32 @@ test('invalid mandatory configuration still uses the fatal application fallback'
 
 test('choosing a page appends its passage to the transcript', async ({ page }) => {
   const pageErrors = collectPageErrors(page);
+  await useFixture(page, 'Player fixture', 'test-fixtures/player-basic/pages');
   await page.goto('/');
   const initialHash = new URL(page.url()).hash;
-  const selectedChoice = page.getByText('Du untersuchst zunächst den Höhleneingang.');
-  const rejectedChoice = page.getByText('Du gehst direkt in die Höhle.');
+  await chooseStoryOption(page, 'Inspect the entrance.');
 
-  await selectedChoice.click();
-
-  await expect(page.getByText('Du bist Odysseus', { exact: false })).toBeVisible();
-  await expect(selectedChoice).toBeVisible();
-  await expect(selectedChoice.locator('xpath=ancestor::*[contains(@class, "pagelink")]')).toHaveClass(/chosen/);
-  await expect(rejectedChoice.locator('xpath=ancestor::*[contains(@class, "pagelink")]')).toHaveClass(/dismissed/);
-  await expect(page.getByText('Du umkreist vorsichtig den Höhleneingang', { exact: false })).toBeVisible();
+  await expect(page.getByText('The fixture story begins here.')).toBeVisible();
+  const selectedChoice = page.locator('.story-passage').first().locator('.committed-choice-turn > .story-choice');
+  await expect(selectedChoice).toHaveText('Inspect the entrance.');
+  await expect(selectedChoice).toHaveAttribute('tabindex', '-1');
+  await expect(page.getByText('Take the direct route.')).toHaveCount(0);
+  await expect(page.getByText('You carefully inspect the entrance.')).toBeVisible();
   expect(new URL(page.url()).hash).not.toBe(initialHash);
   expect(pageErrors).toEqual([]);
 });
 
 test('explicit development mode survives history, reload, rewind, and restart', async ({ page }) => {
+  await useFixture(page, 'Player fixture', 'test-fixtures/player-basic/pages');
   await page.goto('/?mode=dev');
   await expect(page.locator('#development-inspector')).toBeVisible();
   await expect.poll(() => page.evaluate(() => location.hash.length)).toBeGreaterThan(1);
   const initialUrl = page.url();
-  await page.getByText('Du untersuchst zunächst den Höhleneingang.').click();
+  await chooseStoryOption(page, 'Inspect the entrance.');
   await expect(page).not.toHaveURL(initialUrl);
   expect(new URL(page.url()).search).toBe('?mode=dev');
   const middleUrl = page.url();
-  await page.getByText('Weiter…').click();
+  await chooseStoryOption(page, 'Continue onward.');
   await expect(page).not.toHaveURL(middleUrl);
   await page.goBack();
   await expect(page).toHaveURL(middleUrl);
@@ -264,6 +294,7 @@ async function openSessionFixture(page) {
 }
 
 async function chooseAndWaitForCheckpoint(page, text) {
+  await finishStoryReveal(page);
   const previousUrl = page.url();
   await page.locator('.pagelink', { hasText: text }).click();
   await expect(page).not.toHaveURL(previousUrl);
@@ -541,28 +572,29 @@ test('ordinary choices are keyboard-focusable semantic links', async ({ page }) 
 
 test('rejected ordinary choices leave the tab order', async ({ page }) => {
   await openKeyboardFixture(page);
+  await finishStoryReveal(page);
   await page.keyboard.press('Tab');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Keyboard destination' })).toBeVisible();
 
   const rejected = page.getByText('Take the rejected route');
-  await expect(rejected).toHaveAttribute('tabindex', '-1');
-  await expect(rejected).toHaveAttribute('aria-disabled', 'true');
+  await expect(rejected).toHaveCount(0);
   await page.keyboard.press('Tab');
   await expect(page.locator(':focus')).toHaveText('Open the scripted interaction');
-  await rejected.press('Enter');
   await expect(page.getByRole('heading', { name: 'Rejected route A' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Keyboard destination' })).toHaveCount(1);
 });
 
 test('keyboard navigation focuses the newly appended passage', async ({ page }) => {
   await openKeyboardFixture(page);
+  await finishStoryReveal(page);
   await page.keyboard.press('Tab');
   await page.keyboard.press('Enter');
 
   const destination = page.locator('.story-passage[data-page-id="2"]');
   await expect(destination).toBeFocused();
   await expect(destination).toHaveAttribute('tabindex', '-1');
+  await finishStoryReveal(page);
   await page.keyboard.press('Tab');
   await expect(page.locator(':focus')).toHaveText('Open the scripted interaction');
 });
@@ -650,8 +682,8 @@ test('keyboard choice focuses and scrolls to the appended passage', async ({ pag
 
   const destination = page.locator('.story-passage[data-page-id="2"]');
   await expect(destination).toBeFocused();
-  expect(await passageIsVisible(page, '2')).toBe(true);
-  await expect(page.getByText('Rejected choice')).toHaveAttribute('tabindex', '-1');
+  await expect.poll(() => passageIsVisible(page, '2')).toBe(true);
+  await expect(page.getByText('Rejected choice')).toHaveCount(0);
 });
 
 test('scripted choice and goToPage scroll to one settled destination', async ({ page }) => {
@@ -687,10 +719,12 @@ test('reduced motion scroll settles immediately at the appended passage', async 
 test('scripted choices retain native button keyboard behavior', async ({ page }) => {
   const pageErrors = collectPageErrors(page);
   await openKeyboardFixture(page);
+  await finishStoryReveal(page);
   await page.keyboard.press('Tab');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Keyboard destination' })).toBeVisible();
   await expect(page.locator('.story-passage[data-page-id="2"]')).toBeFocused();
+  await finishStoryReveal(page);
   await page.keyboard.press('Tab');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Scripted choice passage' })).toBeVisible();
@@ -736,6 +770,6 @@ test('reduced motion disables story transitions and smooth scrolling', async ({ 
   await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior)).toBe('auto');
 
   await page.getByText('Take the primary route').click();
-  await expect(rejected).toHaveClass(/dismissed/);
+  await expect(rejected).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Keyboard destination' })).toHaveCount(1);
 });

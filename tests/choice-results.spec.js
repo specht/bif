@@ -1,11 +1,37 @@
 import { expect, test } from '@playwright/test';
+import path from 'node:path';
+import storyAnalyzer from '../tools/lib/story-analyzer.js';
+import publicationTools from '../tools/lib/browser-analysis-publication.js';
+
+const { analyzeStory } = storyAnalyzer;
+const { buildBrowserAnalysisPublication } = publicationTools;
 
 async function openFixture(page, mode = 'game') {
-  await page.route(/\/config\.js\?.*/, route => route.fulfill({
+  const analysis = buildBrowserAnalysisPublication(await analyzeStory(path.join(process.cwd(), 'test-fixtures/choice-results')));
+  await page.route(/\/config\.js(?:\?.*)?$/, route => route.fulfill({
     contentType: 'text/javascript',
     body: "export const path = 'test-fixtures/choice-results/pages';",
   }));
+  await page.route(/\/\.story-tools\/analysis\.json(?:\?.*)?$/, route => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify(analysis),
+  }));
   await page.goto(`/?mode=${mode}`);
+}
+
+async function finishStoryReveal(page) {
+  const pending = page.locator('[data-reveal-state="pending"]');
+  if (await pending.count()) {
+    await page.locator('#game_pane').click({ position: { x: 8, y: 8 } });
+    await expect(pending).toHaveCount(0);
+  }
+}
+
+async function chooseStoryOption(page, role, name) {
+  await finishStoryReveal(page);
+  const control = page.getByRole(role, { name });
+  await expect(control).toBeVisible();
+  await expect(control).not.toHaveAttribute('aria-hidden', 'true');
+  await control.click();
 }
 
 test('local choice reveals and freezes its result without reentering the page', async ({ page }) => {
@@ -59,13 +85,13 @@ test('page and local choices share one canonical live set and computed style', a
 });
 
 test('mixed page and loose local choices use direct controls with one measured gap', async ({ page }) => {
-  await page.goto('/?mode=game');
+  await openFixture(page);
   const labels = [
-    'Du schickst zwei Männer vor, um die Höhle auszukundschaften.',
-    'Du untersuchst zunächst den Höhleneingang.',
-    'Du gehst direkt in die Höhle.',
-    'Ask whether he travels this route often.',
-    'Ask whether he saw the suitcase.',
+    'Ask whether this is his usual route.',
+    'Ask whether he travels often.',
+    'Give Adler the key.',
+    'Leave without a result.',
+    'Take the direct route.',
   ];
   const result = await page.locator('.live-choice-set').evaluate((set, expectedLabels) => {
     const items = [...set.children].filter(item => expectedLabels.includes(item.textContent.trim()));
@@ -94,7 +120,7 @@ test('mixed page and loose local choices use direct controls with one measured g
 });
 
 test('ordinary loose Markdown list paragraphs remain intact', async ({ page }) => {
-  await page.route(/\/config\.js\?.*/, route => route.fulfill({
+  await page.route(/\/config\.js(?:\?.*)?$/, route => route.fulfill({
     contentType: 'text/javascript', body: "export const path = 'test-fixtures/loose-list-choice';",
   }));
   await page.route(/\/test-fixtures\/loose-list-choice\/1\.md\?.*/, route => route.fulfill({
@@ -145,7 +171,7 @@ test('local scroll target is finite, clamped, and distinguishes short and tall t
 
 test('a tall local answer anchors its committed turn instead of skipping to the end', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 360 });
-  await page.route(/\/config\.js\?.*/, route => route.fulfill({
+  await page.route(/\/config\.js(?:\?.*)?$/, route => route.fulfill({
     contentType: 'text/javascript', body: "export const path = 'test-fixtures/local-scroll';",
   }));
   const longAnswer = Array.from({ length: 18 }, (_, index) => `Answer paragraph ${index + 1}.`).join('\n\n');
@@ -226,10 +252,10 @@ test('local results replay once after reload', async ({ page }) => {
 
 test('history rewind restores chronological local checkpoints', async ({ page }) => {
   await openFixture(page);
-  await page.getByRole('button', { name: 'Ask whether he travels often.' }).click();
+  await chooseStoryOption(page, 'button', 'Ask whether he travels often.');
   await expect.poll(() => page.url()).toContain('#');
   const firstUrl = page.url();
-  await page.getByRole('button', { name: 'Ask the follow-up.' }).click();
+  await chooseStoryOption(page, 'button', 'Ask the follow-up.');
   await expect.poll(() => page.url()).not.toBe(firstUrl);
   await page.goBack();
   await expect(page.locator('.committed-choice-turn')).toHaveCount(1);
@@ -242,7 +268,7 @@ test('history rewind restores chronological local checkpoints', async ({ page })
 
 test('page choice processes its result before appending the target', async ({ page }) => {
   await openFixture(page);
-  await page.getByRole('link', { name: 'Give Adler the key.' }).click();
+  await chooseStoryOption(page, 'link', 'Give Adler the key.');
   await expect(page.getByRole('heading', { name: 'Adler has the key' })).toBeVisible();
   await expect(page.getByText('Target sees key: true')).toBeVisible();
   await expect(page.getByText('You give Adler the key.')).toBeVisible();
@@ -251,14 +277,44 @@ test('page choice processes its result before appending the target', async ({ pa
 
 test('page navigation after dialogue preserves committed turns and retires the live set', async ({ page }) => {
   await openFixture(page);
-  await page.getByRole('button', { name: 'Ask whether he travels often.' }).click();
-  await page.getByRole('link', { name: 'Give Adler the key.' }).click();
+  await chooseStoryOption(page, 'button', 'Ask whether he travels often.');
+  await chooseStoryOption(page, 'link', 'Give Adler the key.');
   const source = page.locator('.story-passage').first();
   await expect(source.locator('.committed-choice-turn')).toHaveCount(2);
   await expect(source.locator('.live-choice-set')).toHaveCount(0);
   await expect(source.getByText('Every Thursday')).toHaveCount(1);
   await expect(source.getByText('You give Adler the key.')).toHaveCount(1);
   await expect(page.getByText('Target sees key: true')).toBeVisible();
+});
+
+test('leaving immediately retires every unchosen control and commits one canonical framed choice', async ({ page }) => {
+  await openFixture(page);
+  await chooseStoryOption(page, 'link', 'Leave without a result.');
+  const source = page.locator('.story-passage').first();
+  await expect(source.locator('.live-choice-set')).toHaveCount(0);
+  await expect(source.getByText('Ask whether this is his usual route.')).toHaveCount(0);
+  await expect(source.getByText('Ask whether he travels often.')).toHaveCount(0);
+  const committed = source.locator('.committed-choice-turn > .story-choice');
+  await expect(committed).toHaveCount(1);
+  await expect(committed).toHaveText('Leave without a result.');
+  await expect(source.locator('.committed-choice-turn li')).toHaveCount(0);
+  await expect(committed).toHaveAttribute('tabindex', '-1');
+  await expect(committed).toHaveCSS('pointer-events', 'none');
+  await expect(page.getByRole('heading', { name: 'Ordinary destination' })).toBeVisible();
+});
+
+test('local and page committed choices share the canonical component styles', async ({ page }) => {
+  await openFixture(page);
+  await chooseStoryOption(page, 'button', 'Ask whether he travels often.');
+  await finishStoryReveal(page);
+  const readStyle = locator => locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return { border: style.border, radius: style.borderRadius, padding: style.padding, font: style.font, width: element.getBoundingClientRect().width };
+  });
+  const localStyle = await readStyle(page.locator('.committed-choice-turn > .story-choice').first());
+  await chooseStoryOption(page, 'link', 'Leave without a result.');
+  const controls = page.locator('.story-passage').first().locator('.committed-choice-turn > .story-choice');
+  expect(await readStyle(controls.last())).toEqual(localStyle);
 });
 
 test('local choices in game mode do not request analysis', async ({ page }) => {

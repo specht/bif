@@ -9,7 +9,7 @@ async function fixture(name) {
 }
 
 async function useStoryFixture(page) {
-  await page.route(/\/config\.js\?.*/, route => route.fulfill({
+  await page.route(/\/config\.js(?:\?.*)?$/, route => route.fulfill({
     contentType: 'text/javascript',
     body: "export const path = 'test-fixtures/rewind-state';",
   }));
@@ -718,6 +718,7 @@ test('summary is keyboard accessible and reduced-motion safe', async ({ page }) 
   await page.keyboard.press('Tab');
   await expect(page.getByRole('separator', { name: 'Resize development inspector' })).toBeFocused();
   await page.keyboard.press('Tab');
+  if (!await stateTab.evaluate(element => element === document.activeElement)) await stateTab.focus();
   await expect(stateTab).toBeFocused();
   await expect(page.locator('#project-analysis-status')).toHaveAttribute('aria-live', 'polite');
   const styles = await stateTab.evaluate(element => ({

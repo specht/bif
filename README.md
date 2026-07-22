@@ -120,11 +120,12 @@ development mode forces the graph and inspector. With no recognized `mode`
 value, the existing port/URL automatic detection remains in effect. The mode
 stays in the URL query while story session history continues to use the hash.
 
-The initial Playwright suite checks that the configured story renders without
-page errors, navigation appends to the transcript while preserving the chosen
-choice and URL history, and graph rewind removes story variables from an
-abandoned route. The rewind scenario uses a small story under
-`test-fixtures/rewind-state/`.
+Automated tests use small, committed projects under `test-fixtures/`; each test
+selects its fixture configuration and analysis explicitly. Root `config.js` and
+the root story directories are mutable examples, so changing the active starter
+story must not require test updates. Browser interaction helpers also finish or
+await progressive reveal before activating a choice—the click that skips an
+active reveal is deliberately never reused as a choice click.
 
 Checking a story
 ----------------

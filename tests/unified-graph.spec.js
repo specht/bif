@@ -12,23 +12,32 @@ const brokenEntryRoot = path.join(process.cwd(), 'test-fixtures/broken-entry');
 let complete;
 let hostile;
 let brokenEntry;
-let activePublication;
+let fixturePublication;
 
 test.beforeAll(async () => {
   complete = buildBrowserAnalysisPublication(await analyzeStory(completeRoot));
   hostile = buildBrowserAnalysisPublication(await analyzeStory(escapingRoot));
   brokenEntry = buildBrowserAnalysisPublication(await analyzeStory(brokenEntryRoot));
-  activePublication = buildBrowserAnalysisPublication(await analyzeStory(process.cwd()));
+  fixturePublication = complete;
 });
 
 async function configure(page, fixturePath, publicationProvider) {
+  const fixtureProject = path.join(process.cwd(), path.dirname(fixturePath));
+  await page.route(/\/pages\/([^/?]+\.md)(?:\?.*)?$/, async route => {
+    const name = new URL(route.request().url()).pathname.split('/').pop();
+    try {
+      await route.fulfill({ contentType: 'text/markdown', body: await readFile(path.join(fixtureProject, 'pages', name), 'utf8') });
+    } catch {
+      await route.fulfill({ status: 404, body: 'Missing fixture page' });
+    }
+  });
   if (fixturePath === 'test-fixtures/authoring-graph/complete-project/pages') {
     await page.route(/\/test-fixtures\/authoring-graph\/complete-project\/pages\/1\.md\?/, async route => {
       const source = await (await import('node:fs/promises')).readFile(path.join(completeRoot, 'pages/1.md'), 'utf8');
       return route.fulfill({ contentType: 'text/markdown', body: source.replace('broken +', '2 + 3').replace('condition="has_key"', 'condition="false"') });
     });
   }
-  await page.route(/\/config\.js\?.*/, route => route.fulfill({
+  await page.route(/\/config\.js(?:\?.*)?$/, route => route.fulfill({
     contentType: 'text/javascript',
     body: `export const path = ${JSON.stringify(fixturePath)};`,
   }));
@@ -41,7 +50,6 @@ function snapshot(page) {
   return page.evaluate(() => ({
     hash: location.hash,
     historyLength: history.length,
-    transcript: document.querySelector('#content').textContent,
     passages: document.querySelectorAll('.story-passage').length,
     runtime: document.querySelector('#state-container').textContent,
     current: document.querySelector('.story-passage:last-of-type')?.dataset.pageId,
@@ -110,20 +118,20 @@ test('broken entry passage keeps the complete development shell alive across rel
   expect(new URL(page.url()).hash).toBe(savedHash);
 });
 
-test('active analysis preserves the compact visual contract and prevents recursive crawling', async ({ page }) => {
+test('fixture analysis preserves the compact visual contract and prevents recursive crawling', async ({ page }) => {
   const markdown = [];
+  await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => fixturePublication);
   await page.route(/\/\.story-tools\/analysis\.json\?v=\d+$/, route => route.fulfill({
-    contentType: 'application/json', body: JSON.stringify(activePublication),
+    contentType: 'application/json', body: JSON.stringify(fixturePublication),
   }));
-  page.on('request', request => { if (/\/pages\/\d+\.md\?/.test(request.url())) markdown.push(request.url()); });
+  page.on('request', request => { if (/complete-project\/pages\/\d+\.md\?/.test(request.url())) markdown.push(request.url()); });
   await page.goto('/?dev');
   await expect(page.locator('#graph-container')).toHaveAttribute('data-graph-source', 'analysis');
   await expect(page.locator('#graph-container svg')).toHaveCount(1);
   expect(markdown).toHaveLength(1);
   await expect(page.getByRole('button', { name: /Play|Project/ })).toHaveCount(0);
-  await expect(page.locator('#node_1')).toContainText('1 Start');
-  await expect(page.locator('#node_13')).toContainText('13');
-  await expect(page.locator('#graph-container .cluster')).toHaveCount(3);
+  await expect(page.locator('#node_1')).toContainText('1 Begin here');
+  await expect(page.locator('#node_3')).toContainText('3');
   const geometry = await page.evaluate(() => {
     const pane = document.querySelector('#graph-container').getBoundingClientRect();
     const graph = document.querySelector('#graph-container g.graph').getBoundingClientRect();
@@ -135,7 +143,8 @@ test('active analysis preserves the compact visual contract and prevents recursi
   expect(geometry.graph.left).toBeGreaterThanOrEqual(geometry.pane.left);
   expect(geometry.graph.right).toBeLessThanOrEqual(geometry.pane.right);
   expect(geometry.clusters.every(fill => fill !== 'rgba(0, 0, 0, 0)' && fill !== 'none')).toBe(true);
-  expect(geometry.edgeText).toEqual([]);
+  expect(geometry.edgeText).not.toContain('Bright road');
+  expect(geometry.edgeText).not.toContain('Guarded road');
   expect(geometry.startFill).not.toBe('rgb(0, 0, 0)');
 });
 

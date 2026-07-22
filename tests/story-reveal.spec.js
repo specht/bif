@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 async function openChoiceFixture(page, mode = 'game') {
-  await page.route(/\/config\.js\?.*/, route => route.fulfill({
+  await page.route(/\/config\.js(?:\?.*)?$/, route => route.fulfill({
     contentType: 'text/javascript', body: "export const path = 'test-fixtures/choice-results/pages';",
   }));
   await page.goto(`/?mode=${mode}`);
@@ -91,7 +91,7 @@ test('keyboard skip is consumed and reduced motion reveals immediately', async (
 });
 
 test('new page commits before reveal, preserves prior transcript, and restores immediately', async ({ page }) => {
-  await page.route(/\/config\.js\?.*/, route => route.fulfill({
+  await page.route(/\/config\.js(?:\?.*)?$/, route => route.fulfill({
     contentType: 'text/javascript', body: "export const path = 'test-fixtures/progressive-page';",
   }));
   await page.route(/\/test-fixtures\/progressive-page\/1\.md\?.*/, route => route.fulfill({
