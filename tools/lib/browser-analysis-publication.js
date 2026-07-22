@@ -12,6 +12,7 @@ function sanitizeDiagnostic(item) {
     message: item.message,
   };
   if (item.target !== undefined) result.target = item.target;
+  if (item.choiceId !== undefined) result.choiceId = item.choiceId;
   for (const field of ["scriptIndex", "scriptLine", "scriptColumn", "expressionLine", "expressionColumn", "rawMessage", "kind"]) {
     if (item[field] !== undefined) result[field] = item[field];
   }
@@ -36,6 +37,10 @@ function buildBrowserAnalysisPublication(analysis) {
       missingTargets: model.summary.missingTargets,
       errors: model.summary.errors,
       warnings: model.summary.warnings,
+      pageChoices: model.summary.pageChoices,
+      localChoices: model.summary.localChoices,
+      resultBlocks: model.summary.resultBlocks,
+      resultScripts: model.summary.resultScripts,
     },
     nodes: model.nodes.map(node => ({
       kind: node.kind,
@@ -50,6 +55,7 @@ function buildBrowserAnalysisPublication(analysis) {
       incomingCount: node.incomingCount,
       outgoingCount: node.outgoingCount,
       counts: { ...node.counts },
+      choices: node.choices.map(choice => ({ ...choice })),
       errorCount: node.errorCount,
       warningCount: node.warningCount,
       diagnostics: node.diagnostics.map(sanitizeDiagnostic),
@@ -69,6 +75,9 @@ function buildBrowserAnalysisPublication(analysis) {
       column: edge.column,
       broken: edge.broken,
       diagnostics: edge.diagnostics.map(sanitizeDiagnostic),
+      choiceId: edge.choiceId,
+      resultScriptCount: edge.resultScriptCount,
+      hasVisibleResult: edge.hasVisibleResult,
     })),
     groups: model.groups.map(group => ({
       groupId: group.groupId,

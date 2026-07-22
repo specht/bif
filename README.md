@@ -187,6 +187,8 @@ with the normal reader site.
 Project and title contract
 --------------------------
 
+The complete authoring reference is [SYNTAX.md](SYNTAX.md).
+
 `config.js` remains mandatory and marks the project. Its `path` export selects
 the active story directory; the story always starts at that directory's
 `1.md`. A legacy config title or start-page value is ignored with a migration
@@ -242,6 +244,27 @@ exits with status `1`. Warnings alone pass unless `--strict` is supplied.
 Story script helpers
 --------------------
 
+For simple dialogue and state changes, prefer a Markdown choice result block:
+
+```markdown
+- [Ask Adler about the train.](.)
+
+    > “Every Thursday,” he says.
+```
+
+The exact `.` target is a local choice: it stays on the current page and commits
+the selected button and its indented result as a chronological dialogue turn.
+The old live choice set is replaced by one reevaluated set after the result.
+Local choices are analyzed and counted but create no graph nodes or edges.
+A restrained transcript-container scroll reveals the new turn and final live
+choice set; long answers remain anchored at their beginning, and reduced-motion
+users receive the final position without smooth animation. All available story
+choices are presented together at the end of the active page.
+A result may also contain an inline `<script>` and may
+belong to an ordinary page choice, in which case it runs before the target page
+opens. See [the syntax reference](SYNTAX.md#6-choice-result-blocks) for lifecycle,
+indentation, replay, and rollback rules.
+
 Embedded page scripts can use these helpers:
 
 ```js
@@ -250,7 +273,8 @@ await presentChoice(options)
 await goToPage(pageId)
 ```
 
-`print()` appends rendered Markdown to the transcript. `presentChoice()` returns
+`print()` appends rendered Markdown to the transcript. `presentChoice()` is the
+advanced API for dynamic choices and returns
 a Promise that resolves with the selected option, and `goToPage()` returns a
 Promise that resolves after the destination has been appended through the same
 story transition used by normal choices. Story scripts should `await` both

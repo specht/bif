@@ -12,11 +12,13 @@ const brokenEntryRoot = path.join(process.cwd(), 'test-fixtures/broken-entry');
 let complete;
 let hostile;
 let brokenEntry;
+let activePublication;
 
 test.beforeAll(async () => {
   complete = buildBrowserAnalysisPublication(await analyzeStory(completeRoot));
   hostile = buildBrowserAnalysisPublication(await analyzeStory(escapingRoot));
   brokenEntry = buildBrowserAnalysisPublication(await analyzeStory(brokenEntryRoot));
+  activePublication = buildBrowserAnalysisPublication(await analyzeStory(process.cwd()));
 });
 
 async function configure(page, fixturePath, publicationProvider) {
@@ -110,6 +112,9 @@ test('broken entry passage keeps the complete development shell alive across rel
 
 test('active analysis preserves the compact visual contract and prevents recursive crawling', async ({ page }) => {
   const markdown = [];
+  await page.route(/\/\.story-tools\/analysis\.json\?v=\d+$/, route => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify(activePublication),
+  }));
   page.on('request', request => { if (/\/pages\/\d+\.md\?/.test(request.url())) markdown.push(request.url()); });
   await page.goto('/?dev');
   await expect(page.locator('#graph-container')).toHaveAttribute('data-graph-source', 'analysis');

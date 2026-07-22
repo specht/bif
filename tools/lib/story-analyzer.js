@@ -69,7 +69,7 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
     try { source = await fs.readFile(filePath, "utf8"); }
     catch (error) {
       diagnostics.push(diagnostic("error", "file-read-error", file, 1, 1, `Cannot read page: ${error.message}`));
-      pages.push({ id, filename, file, group: "", graphLabel: "", links: [], scripts: [], conditions: [], expressions: [], images: [] });
+      pages.push({ id, filename, file, group: "", graphLabel: "", links: [], choices: [], resultBlocks: [], scripts: [], pageScripts: [], resultScripts: [], conditions: [], expressions: [], images: [] });
       continue;
     }
     sourceEntries.push([file, source]);
@@ -79,7 +79,7 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
       source = metadata.bodyMarkdown;
       for (const message of metadata.warnings) diagnostics.push(diagnostic("warning", "missing-story-title", file, 1, 1, message));
     }
-    const parsed = parsePage(source);
+    const parsed = parsePage(source, { pageId: id });
     if (parsed.metadata.malformed) diagnostics.push(diagnostic("warning", "malformed-metadata", file, parsed.metadata.line, 1, "Graph metadata comment is malformed."));
     const page = {
       id,
@@ -88,7 +88,12 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
       group: parsed.metadata.group,
       graphLabel: parsed.metadata.summary,
       links: parsed.links,
+      choices: parsed.choices,
+      resultBlocks: parsed.resultBlocks,
       scripts: parsed.scripts,
+      pageScripts: parsed.pageScripts,
+      resultScripts: parsed.resultScripts,
+      unsupportedScripts: parsed.unsupportedScripts,
       conditions: parsed.conditions,
       expressions: parsed.expressions,
       images: parsed.images,
@@ -96,8 +101,23 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
     pages.push(page);
 
     for (const link of parsed.links) {
+      if (link.kind === "local" || link.local) continue;
       if (!isInternalTarget(link.target)) continue;
-      edges.push({ source: id, target: link.target, text: link.text, label: link.label || null, condition: link.condition || null, file, line: link.line, column: link.column });
+      edges.push({ source: id, target: link.target, text: link.text, label: link.label || null, condition: link.condition || null, file, line: link.line, column: link.column, choiceId: link.choiceId, resultScriptCount: link.resultScriptCount, hasVisibleResult: link.hasVisibleResult });
+    }
+    for (const choice of parsed.choices) {
+      if (choice.local && !choice.hasVisibleResult && choice.resultScriptCount === 0) {
+        diagnostics.push(diagnostic("warning", "local-choice-no-op", file, choice.line, choice.column, "A local choice has no result content or script and will not visibly change the page.", { choiceId: choice.choiceId }));
+      }
+    }
+    for (const result of parsed.resultBlocks) {
+      if (result.nestedChoices.length) diagnostics.push(diagnostic("error", "nested-result-choice", file, result.resultStartLine || result.line, 1, "Story choices cannot be nested inside a choice result. Put the follow-up question at the top level and use a condition.", { choiceId: result.identity }));
+    }
+    for (const script of parsed.unsupportedScripts) {
+      const message = script.kind === "module"
+        ? "Module scripts are not supported. Use a normal inline script."
+        : "External script sources are not supported. Put story code in an inline script.";
+      diagnostics.push(diagnostic("error", "unsupported-script", file, script.line, script.column, message, { choiceId: script.choiceId }));
     }
     for (const script of parsed.scripts) {
       const error = checkScript(script.source);
@@ -175,6 +195,11 @@ function finish(root, project, pages, edges, diagnostics, reachablePages = 0, so
       links: edges.length,
       groups: new Set(pages.map((page) => page.group).filter(Boolean)).size,
       scripts: pages.reduce((sum, page) => sum + page.scripts.length, 0),
+      pageScripts: pages.reduce((sum, page) => sum + page.pageScripts.length, 0),
+      resultScripts: pages.reduce((sum, page) => sum + page.resultScripts.length, 0),
+      pageChoices: edges.length,
+      localChoices: pages.reduce((sum, page) => sum + page.choices.filter(choice => choice.local).length, 0),
+      resultBlocks: pages.reduce((sum, page) => sum + page.resultBlocks.filter(block => block.hasResult).length, 0),
       conditions: pages.reduce((sum, page) => sum + page.conditions.length, 0),
       expressions: pages.reduce((sum, page) => sum + page.expressions.length, 0),
       images: pages.reduce((sum, page) => sum + page.images.length, 0),

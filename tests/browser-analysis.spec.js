@@ -103,6 +103,29 @@ test('browser icon helper uses the allowlisted currentColor sprite safely', asyn
   });
 });
 
+test('legacy dot topology is removed before Problems and graph ingestion', async ({ page }) => {
+  await page.goto('/?mode=game');
+  const normalized = await page.evaluate(async () => {
+    const { normalizeLegacyLocalTopology } = await import('/lib/browser-analysis-client.js');
+    return normalizeLegacyLocalTopology({
+      analysisHash: 'old',
+      summary: { missingTargets: 1, errors: 1, warnings: 0 },
+      nodes: [
+        { kind: 'page', nodeId: 'page-1', pageId: '1', diagnostics: [] },
+        { kind: 'missing', nodeId: 'missing-dot', pageId: '.', diagnostics: [{ severity: 'error', code: 'missing-page', target: '.' }] },
+      ],
+      edges: [{ edgeId: 'dot-edge', source: '1', target: '.', targetNodeId: 'missing-dot' }],
+      groups: [{ groupId: 'missing', nodeIds: ['missing-dot'] }],
+      diagnostics: [{ severity: 'error', code: 'missing-page', target: '.', message: "links to missing page '.'" }],
+    });
+  });
+  expect(normalized.nodes.map(node => node.pageId)).toEqual(['1']);
+  expect(normalized.edges).toEqual([]);
+  expect(normalized.groups).toEqual([]);
+  expect(normalized.diagnostics).toEqual([]);
+  expect(normalized.summary).toMatchObject({ missingTargets: 0, errors: 0, warnings: 0 });
+});
+
 test('background polling recovers from the Live Server publication race', async ({ page }) => {
   await useStoryFixture(page);
   await usePollingInterval(page);
