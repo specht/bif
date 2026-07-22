@@ -77,12 +77,14 @@ test("generated HTML is standalone and embeds JSON safely", async () => {
 });
 
 test("CLI writes graphs on success and analyzer error with matching exit codes", () => {
+  const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "story-graph-cli-"));
   const validOutput = path.join(directory, "valid.html");
   const brokenOutput = path.join(directory, "broken.html");
-  const valid = spawnSync(process.execPath, ["tools/story-graph.js", "--project", path.join(repository, "test-fixtures/analyzer/valid"), "--output", validOutput], { cwd: repository, encoding: "utf8" });
+  const valid = spawnSync(process.execPath, ["tools/story-graph.js", "--project", path.join(repository, "test-fixtures/analyzer/valid"), "--output", validOutput], { cwd: repository, encoding: "utf8", env });
   assert.ifError(valid.error); assert.equal(valid.status, 0, valid.stderr); assert.ok(fs.existsSync(validOutput)); assert.match(valid.stdout, /Authoring graph written/);
-  const broken = spawnSync(process.execPath, ["tools/story-graph.js", "--project", path.join(repository, "test-fixtures/analyzer/missing-link"), "--output", brokenOutput], { cwd: repository, encoding: "utf8" });
+  const broken = spawnSync(process.execPath, ["tools/story-graph.js", "--project", path.join(repository, "test-fixtures/analyzer/missing-link"), "--output", brokenOutput], { cwd: repository, encoding: "utf8", env });
   assert.ifError(broken.error); assert.equal(broken.status, 1, broken.stderr); assert.ok(fs.existsSync(brokenOutput));
   const html = fs.readFileSync(brokenOutput, "utf8"); assert.match(html, /node-missing-/); assert.match(html, /missing-page/);
 });

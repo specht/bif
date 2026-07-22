@@ -103,6 +103,7 @@ async function publishProjectAnalysis(projectRoot = process.cwd(), options = {})
     publication,
     serialized,
     contentHash: publication.contentHash,
+    analysisHash: publication.analysisHash,
     summary: publication.summary,
     outputPath: path.join(root, ".story-tools", "analysis.json"),
   };

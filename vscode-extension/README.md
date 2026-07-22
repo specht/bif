@@ -9,7 +9,7 @@ Features:
 - automatic saved-file refresh with debounced filesystem watchers;
 - a status-bar page/error/warning summary;
 - a complete offline graph containing unreachable pages and missing targets;
-- copyable source locations and links back to VS Code.
+- copyable relative source locations in the offline graph.
 
 After each latest saved-file analysis, the extension writes
 `.story-tools/analysis.json`. This Git-ignored, versioned JSON file is a

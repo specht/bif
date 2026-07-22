@@ -1,5 +1,6 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const { readProjectConfig } = require("./project-config");
 const { parsePage } = require("./page-parser");
 const { checkExpression, checkScript } = require("./javascript-checker");
@@ -23,12 +24,14 @@ function cleanAssetPath(src) {
 async function analyzeStory(projectRoot = process.cwd(), options = {}) {
   const root = path.resolve(projectRoot);
   const diagnostics = [];
+  const sourceEntries = [];
+  try { sourceEntries.push(["config.js", await fs.readFile(path.join(root, "config.js"), "utf8")]); } catch {}
   let config;
   try {
     config = await readProjectConfig(root);
   } catch (error) {
     diagnostics.push(diagnostic("error", "config-error", "config.js", error.loc?.line || 1, (error.loc?.column || 0) + 1, error.message));
-    return finish(root, { title: FALLBACK_TITLE, pagesPath: "", startPage: "1" }, [], [], diagnostics);
+    return finish(root, { title: FALLBACK_TITLE, pagesPath: "", startPage: "1" }, [], [], diagnostics, 0, sourceEntries);
   }
 
   const pagesDirectory = path.resolve(root, config.pagesPath);
@@ -36,7 +39,7 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
   let storyTitle = FALLBACK_TITLE;
   if (!pagesDirectory.startsWith(`${root}${path.sep}`) && pagesDirectory !== root) {
     diagnostics.push(diagnostic("error", "pages-path-outside-project", "config.js", 1, 1, `Configured story path escapes the project: ${config.pagesPath}`));
-    return finish(root, { ...config, title: FALLBACK_TITLE, startPage: "1" }, [], [], diagnostics);
+    return finish(root, { ...config, title: FALLBACK_TITLE, startPage: "1" }, [], [], diagnostics, 0, sourceEntries);
   }
 
   let files;
@@ -47,7 +50,7 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
       .sort(collator.compare);
   } catch (error) {
     diagnostics.push(diagnostic("error", "pages-path-missing", relative(root, pagesDirectory), 1, 1, `Cannot read configured story directory: ${error.message}`));
-    return finish(root, { ...config, title: FALLBACK_TITLE, startPage: "1" }, [], [], diagnostics);
+    return finish(root, { ...config, title: FALLBACK_TITLE, startPage: "1" }, [], [], diagnostics, 0, sourceEntries);
   }
 
   const pages = [];
@@ -69,6 +72,7 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
       pages.push({ id, filename, file, group: "", graphLabel: "", links: [], scripts: [], conditions: [], expressions: [], images: [] });
       continue;
     }
+    sourceEntries.push([file, source]);
     if (id === "1") {
       const metadata = resolveStoryMetadata(source, { sourcePath: file });
       storyTitle = metadata.title;
@@ -147,14 +151,14 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
     if (!reachable.has(page.id)) diagnostics.push(diagnostic("warning", "unreachable-page", page.file, 1, 1, `Page '${page.id}' is unreachable from page '${startPage}'.`));
   }
 
-  return finish(root, { ...config, title: storyTitle, startPage }, pages, edges, diagnostics, reachable.size);
+  return finish(root, { ...config, title: storyTitle, startPage }, pages, edges, diagnostics, reachable.size, sourceEntries);
 }
 
 function relative(root, value) {
   return path.relative(root, value).split(path.sep).join("/") || ".";
 }
 
-function finish(root, project, pages, edges, diagnostics, reachablePages = 0) {
+function finish(root, project, pages, edges, diagnostics, reachablePages = 0, sourceEntries = []) {
   pages.sort((a, b) => collator.compare(a.id, b.id) || a.file.localeCompare(b.file));
   edges.sort((a, b) => collator.compare(a.source, b.source) || collator.compare(a.target, b.target) || a.line - b.line || a.column - b.column);
   diagnostics.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.column - b.column || severityOrder[a.severity] - severityOrder[b.severity] || a.code.localeCompare(b.code));
@@ -162,6 +166,7 @@ function finish(root, project, pages, edges, diagnostics, reachablePages = 0) {
   for (const item of diagnostics) counts[item.severity === "error" ? "errors" : item.severity === "warning" ? "warnings" : "info"] += 1;
   return {
     version: 1,
+    contentHash: crypto.createHash("sha256").update(JSON.stringify(sourceEntries)).digest("hex"),
     project: { root: ".", title: project.title, pagesPath: project.pagesPath, startPage: project.startPage },
     summary: {
       pages: pages.length,

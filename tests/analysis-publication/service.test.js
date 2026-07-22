@@ -4,6 +4,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { test } = require("node:test");
 const { analyzeStory } = require("../../tools/lib/story-analyzer");
+const { buildBrowserAnalysisPublication } = require("../../tools/lib/browser-analysis-publication");
 const {
   ProjectAnalysisError,
   publishProjectAnalysis,
@@ -33,6 +34,7 @@ test("shared service analyzes once and publishes the returned model", async () =
     assert.equal(result.outputPath, path.join(root, ".story-tools", "analysis.json"));
     assert.deepEqual(JSON.parse(await fs.readFile(result.outputPath, "utf8")), result.publication);
     assert.equal(result.contentHash, result.publication.contentHash);
+    assert.equal(result.analysisHash, result.publication.analysisHash);
     assert.deepEqual(result.summary, result.publication.summary);
     assert.equal(result.analysis.summary.pages, result.summary.pages);
     assert.equal(result.publication.schemaVersion, 1);
@@ -56,10 +58,27 @@ test("unchanged project publication has byte-identical JSON, hash, and summary",
     assert.deepEqual(await fs.readFile(second.outputPath), firstBytes);
     assert.equal(second.serialized, first.serialized);
     assert.equal(second.contentHash, first.contentHash);
+    assert.equal(second.analysisHash, first.analysisHash);
     assert.deepEqual(second.summary, first.summary);
   } finally {
     await fs.rm(parent, { recursive: true, force: true });
   }
+});
+
+test("analysis identity tracks meaningful output independently of source identity", async () => {
+  const analysis = await analyzeStory(fixture("complete-project"));
+  const first = buildBrowserAnalysisPublication(analysis);
+  const identical = buildBrowserAnalysisPublication({ ...analysis, generatedAt: Date.now(), temporaryPath: "/tmp/ignored" });
+  const changed = buildBrowserAnalysisPublication({
+    ...analysis,
+    diagnostics: [...analysis.diagnostics, {
+      severity: "warning", code: "test-analysis-change", file: "pages/1.md", line: 1, column: 1, message: "Meaningful (context)",
+    }],
+  });
+  assert.equal(identical.contentHash, first.contentHash);
+  assert.equal(identical.analysisHash, first.analysisHash);
+  assert.equal(changed.contentHash, first.contentHash);
+  assert.notEqual(changed.analysisHash, first.analysisHash);
 });
 
 test("changed project atomically replaces valid output without temporary files", async () => {

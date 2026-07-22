@@ -37,7 +37,19 @@
             <button id="bu_reset_game" class="story-restart icon-text"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-refresh"></use></svg><span class="icon-label">Spiel neu starten</span></button>
         </nav>
         <script type="module">
-            import(`/lib/script.js?v=${ts}`).then(mod => mod.init());
+            function renderFatalApplicationFailure() {
+                const failure = document.createElement('main');
+                failure.id = 'fatal-application-error';
+                failure.setAttribute('role', 'alert');
+                failure.textContent = 'The story application could not be started.';
+                document.body.replaceChildren(failure);
+            }
+            import(`/lib/script.js?v=${ts}`)
+                .then(mod => mod.init())
+                .catch(error => {
+                    console.error('Could not initialize story application:', error);
+                    renderFatalApplicationFailure();
+                });
         </script>
     </body>
 </html>

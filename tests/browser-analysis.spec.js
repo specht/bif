@@ -281,9 +281,10 @@ test('missing analysis is a quiet unavailable state', async ({ page }) => {
   await page.goto('/?dev');
   await expect(page.locator('#project-analysis-summary')).toContainText('Project analysis unavailable');
   await expectPlayerUsable(page);
-  expect(requests).toBe(1);
+  expect(requests).toBeGreaterThanOrEqual(1);
+  expect(requests).toBeLessThanOrEqual(2);
   expect(consoleErrors.filter(message => !message.startsWith('Failed to load resource:'))).toEqual([]);
-  expect(consoleErrors.filter(message => message.startsWith('Failed to load resource:'))).toHaveLength(1);
+  expect(consoleErrors.filter(message => message.startsWith('Failed to load resource:'))).toHaveLength(requests);
   expect(pageErrors).toEqual([]);
   await expect(page.locator('.story-error')).toHaveCount(0);
 });

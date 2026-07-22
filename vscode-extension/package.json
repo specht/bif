@@ -19,8 +19,7 @@
     "onCommand:bif.refreshDiagnostics",
     "onCommand:bif.openStoryGraph",
     "onCommand:bif.showStorySummary",
-    "onCommand:bif.showOutput",
-    "onUri"
+    "onCommand:bif.showOutput"
   ],
   "contributes": {
     "commands": [

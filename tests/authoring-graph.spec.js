@@ -48,7 +48,7 @@ test('page selection shows source, reachability, choices, and diagnostics', asyn
   await expect(page.locator('#details')).toContainText('Reachable');
   await expect(page.locator('#details')).toContainText('Take the guarded road');
   await expect(page.locator('#details')).toContainText('expression-syntax');
-  await expect(page.getByRole('link', { name: 'Open in VS Code' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open in VS Code' })).toHaveCount(0);
 });
 
 test('parallel edge selection retains the correct choice metadata', async ({ page }) => {
@@ -98,7 +98,7 @@ test('status and group filters isolate nodes and can restore the full graph', as
   await expect(page.locator('.authoring-node:not(.filtered)')).toHaveCount(4);
 });
 
-test('zoom, fit, reset, and source-link contracts work', async ({ page }) => {
+test('zoom, fit, reset, and source-location contracts work', async ({ page }) => {
   await openGraph(page);
   const canvas = page.locator('#canvas');
   const initial = await canvas.getAttribute('data-view-state');
@@ -108,8 +108,7 @@ test('zoom, fit, reset, and source-link contracts work', async ({ page }) => {
   await page.locator('#reset').click();
   await expect(canvas).toHaveAttribute('data-view-state', '1.000,0,0');
   await page.locator('[id="node-page-31"]').click();
-  const sourceLink = page.getByRole('link', { name: 'Open in VS Code' });
-  await expect(sourceLink).toHaveAttribute('href', /^vscode:\/\/file\//);
+  await expect(page.locator('a[href^="vscode:"]')).toHaveCount(0);
   await expect(page.locator('.location').first()).toHaveText('pages/1.md:1:1');
   await expect(page.locator('.copy-location').first()).toHaveAttribute('data-location', 'pages/1.md:1:1');
 });

@@ -48,14 +48,10 @@ page-level form `(line N)` instead of embedded-parser coordinates. The inspector
 disabled when reduced motion is requested, and its horizontal separator can be
 dragged or adjusted with Arrow keys (Shift uses larger steps). In development
 mode the restart control lives in the top toolbar instead of covering the
-inspector. The explicit icon-and-text **VS Code** action remains; Copy location
-was removed. Shared icon-and-text controls use consistent center alignment.
-
-Each problem offers **Open in VS Code**, which requires the BIF Authoring Tools
-extension. Source links contain only the
-relative file and one-based line and column—never an absolute project path. If
-the editor link is unavailable, use `Ctrl+P` to open the relative file and
-`Ctrl+G` to jump to its visible line. Pointer graph navigation
+inspector. Problems do not open an external editor or protocol; selecting one
+selects its associated graph item. Shared icon-and-text controls use consistent
+center alignment. Use the visible relative path and line with the editor's file
+and line navigation when source editing is needed. Pointer graph navigation
 does not move focus to a passage or show its keyboard-only outline; keyboard
 graph and transcript navigation retain a visible passage focus indicator.
 
@@ -70,6 +66,36 @@ contextual **Retry** action. If analysis is unavailable, the older recursive
 play graph remains as a visibly limited fallback. Normal playback never
 requests or polls the file, so static reader deployment remains independent of
 analysis tooling and Node.js.
+
+Published diagnostics keep the student-facing `message` semantic: parser
+prefixes such as `Script N:` and parser-local coordinate suffixes are excluded.
+The page-relative `file`, `line`, and `column` remain structured, as do optional
+script/expression-local coordinates. The browser renders the primary location
+as `<message> (line N)`.
+
+The publication has two deterministic identities. `contentHash` identifies the
+story source and is used for source-snippet caching. `analysisHash` identifies
+the meaningful browser model (title, counts, graph structure, locations, and
+diagnostics) and drives refresh/rerender decisions. Older snapshots without an
+`analysisHash` use a stable fingerprint until a current snapshot arrives.
+
+In development mode the header uses a title/action row and a separate wrapping
+counts/status row. Only nonzero problem counts are shown; a clean analysis shows
+a green check icon with neutral `No problems` text.
+
+Passage processing is fail-stop. Executable fragments are syntax-preflighted,
+then rendered into detached staging output against a snapshot of story state.
+Success commits state, passage DOM, history, and choices once. The first script,
+expression, or condition failure discards the staged passage, restores state,
+and leaves the previous transcript usable. Development mode gives a concise
+relative file/line notice and keeps details in Problems; game mode shows only
+`This part of the story could not be loaded.` and does not fetch analysis for it.
+Application bootstrap failures remain fatal when mandatory configuration cannot
+be loaded. Passage failures are recoverable after the shell is initialized: a
+broken entry passage still leaves the development title, graph, Problems, and
+State inspector available. Reloading after the source is fixed retries the
+intended passage without retaining failed state; game mode keeps its reader
+shell and generic notice.
 
 Development workspace choices survive a Live Server reload for the current tab.
 Versioned `sessionStorage` retains the selected inspector tab, collapsed state,
@@ -190,8 +216,8 @@ missing-target nodes, parallel choices, metadata groups, and analyzer
 diagnostics.
 
 The graph supports search, status and group filters, pan and zoom controls, and
-details for pages and individual choices. Source locations can be copied or
-opened through `vscode://` links. A custom project and output file can be used
+details for pages and individual choices. Relative source locations can be
+copied. A custom project and output file can be used
 with:
 
 ```bash

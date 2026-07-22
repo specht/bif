@@ -77,6 +77,30 @@ test('game mode derives the title from the first H1 without analysis', async ({ 
   expect(analysisRequests).toEqual([]);
 });
 
+test('a broken entry passage remains a recoverable game-mode failure', async ({ page }) => {
+  const analysisRequests = [];
+  page.on('request', request => { if (request.url().includes('analysis.json')) analysisRequests.push(request.url()); });
+  await useFixture(page, 'Broken entry fixture', 'test-fixtures/broken-entry/pages');
+  await page.goto('/?mode=game');
+  await expect(page).toHaveTitle('Broken entry fixture');
+  await expect(page.locator('#content .story-error')).toHaveText('This part of the story could not be loaded.');
+  await expect(page.locator('#content .story-error')).toHaveCount(1);
+  await expect(page.locator('#content')).not.toContainText(/test-fixtures|line 8|script|SyntaxError|ReferenceError|crew_count|later prose|Forbidden later choice|\{\}/i);
+  await expect(page.locator('#content > .story-restart')).toBeVisible();
+  await expect(page.locator('#development-inspector, #graph-panel')).toHaveCount(0);
+  expect(analysisRequests).toEqual([]);
+});
+
+test('invalid mandatory configuration still uses the fatal application fallback', async ({ page }) => {
+  await page.route(/\/config\.js\?.*/, route => route.fulfill({
+    contentType: 'text/javascript',
+    body: 'throw new Error("invalid fixture configuration");',
+  }));
+  await page.goto('/?mode=dev');
+  await expect(page.locator('#fatal-application-error')).toHaveText('The story application could not be started.');
+  await expect(page.locator('#content, #development-inspector')).toHaveCount(0);
+});
+
 test('choosing a page appends its passage to the transcript', async ({ page }) => {
   const pageErrors = collectPageErrors(page);
   await page.goto('/');
@@ -389,13 +413,16 @@ test('a synchronous script failure has page context and is not reported as missi
   await openErrorFixture(page);
   await page.locator('.pagelink', { hasText: 'Open the runtime-error page' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Runtime-error passage' })).toHaveCount(1);
-  await expect(page.getByText('Content after the broken script.')).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: 'Runtime-error passage' })).toHaveCount(0);
+  await expect(page.getByText('Content after the broken script.')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Forbidden later choice' })).toHaveCount(0);
+  await expect(page.locator('#state-container')).toContainText('original');
+  await expect(page.locator('#state-container')).not.toContainText('mutated');
   const error = page.locator('.story-error');
-  await expect(error).toContainText(/Script error/i);
+  await expect(error).toContainText('This passage could not be completed.');
   await expect(error).toContainText('test-fixtures/story-errors/2.md');
   await expect(error).toContainText(/line \d+/);
-  await expect(error).toContainText('synchronous fixture failure');
+  await expect(error).not.toContainText('synchronous fixture failure');
   await expect(page.getByText(/page .*not found|Seite .*nicht gefunden/i)).toHaveCount(0);
   expect(pageErrors).toEqual([]);
 });
@@ -406,39 +433,53 @@ test('a script syntax error is distinguished from a missing page', async ({ page
   await page.locator('.pagelink', { hasText: 'Open the syntax-error page' }).click();
 
   const error = page.locator('.story-error');
-  await expect(error).toContainText(/Script syntax error/i);
+  await expect(error).toContainText('This passage could not be completed.');
   await expect(error).toContainText('test-fixtures/story-errors/3.md');
-  await expect(error).toContainText(/Unexpected token|SyntaxError/i);
+  await expect(error).not.toContainText(/Unexpected token|SyntaxError/i);
+  await expect(page.locator('#state-container')).toContainText('original');
+  await expect(page.locator('#state-container')).not.toContainText('mutated');
   await expect(page.getByText(/page .*not found|Seite .*nicht gefunden/i)).toHaveCount(0);
   expect(pageErrors).toEqual([]);
 });
 
-test('a broken condition is visible while valid false remains silent', async ({ page }) => {
+test('game-mode passage failures expose no internals and request no analysis', async ({ page }) => {
+  await useFixture(page, 'Story error fixture', 'test-fixtures/story-errors');
+  let analysisRequests = 0;
+  await page.route(/\/\.story-tools\/analysis\.json/, route => { analysisRequests += 1; return route.abort(); });
+  await page.goto('/?mode=game');
+  await page.locator('.pagelink', { hasText: 'Open the syntax-error page' }).click();
+  const error = page.locator('.story-error');
+  await expect(error).toHaveText('This part of the story could not be loaded.');
+  await expect(error).not.toContainText(/pages|line|script|SyntaxError|Unexpected/i);
+  expect(analysisRequests).toBe(0);
+});
+
+test('a broken condition atomically discards the passage and later content', async ({ page }) => {
   const pageErrors = collectPageErrors(page);
   await openErrorFixture(page);
   await page.locator('.pagelink', { hasText: 'Open the condition-error page' }).click();
 
   await expect(page.getByText('Valid false content must stay hidden.')).toHaveCount(0);
-  await expect(page.getByText('Content after the broken condition.')).toBeVisible();
+  await expect(page.getByText('Content after the broken condition.')).toHaveCount(0);
   const error = page.locator('.story-error');
-  await expect(error).toContainText(/Condition error/i);
-  await expect(error).toContainText('missingCondition.value');
-  await expect(error).toContainText(/undefined|null|ReferenceError|TypeError/i);
+  await expect(error).toContainText('This passage could not be completed.');
+  await expect(error).not.toContainText('missingCondition.value');
+  await expect(error).not.toContainText(/undefined|null|ReferenceError|TypeError/i);
   await expect(error).toContainText('test-fixtures/story-errors/4.md');
   await expect(error).toContainText(/line \d+/);
   expect(pageErrors).toEqual([]);
 });
 
-test('a broken inline expression reports its source and allows later content', async ({ page }) => {
+test('a broken inline expression atomically discards earlier and later output', async ({ page }) => {
   const pageErrors = collectPageErrors(page);
   await openErrorFixture(page);
   await page.locator('.pagelink', { hasText: 'Open the expression-error page' }).click();
 
-  await expect(page.getByText('Valid expression result: 5')).toBeVisible();
-  await expect(page.getByText('Content after the broken expression.')).toBeVisible();
+  await expect(page.getByText('Valid expression result: 5')).toHaveCount(0);
+  await expect(page.getByText('Content after the broken expression.')).toHaveCount(0);
   const error = page.locator('.story-error');
-  await expect(error).toContainText(/Expression error/i);
-  await expect(error).toContainText('missingInventory.key.name');
+  await expect(error).toContainText('This passage could not be completed.');
+  await expect(error).not.toContainText('missingInventory.key.name');
   await expect(error).toContainText('test-fixtures/story-errors/5.md');
   await expect(error).toContainText(/line \d+/);
   await expect(page.getByText(/page .*not found|Seite .*nicht gefunden/i)).toHaveCount(0);
@@ -453,14 +494,14 @@ test('an asynchronous script rejection retains page context', async ({ page }) =
   await page.getByRole('button', { name: 'Continue the failing script' }).click();
 
   const error = page.locator('.story-error');
-  await expect(error).toContainText(/Async script error/i);
+  await expect(error).toContainText('This passage could not be completed.');
   await expect(error).toContainText('test-fixtures/story-errors/6.md');
-  await expect(error).toContainText('asynchronous fixture failure');
+  await expect(error).not.toContainText('asynchronous fixture failure');
   await expect(page.getByRole('heading', { name: 'Valid destination' })).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: 'Async-error passage' })).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: 'Async-error passage' })).toHaveCount(0);
   const replayHistory = await page.evaluate(() => LZString.decompressFromEncodedURIComponent(location.hash.slice(1)).split(','));
-  expect(replayHistory.filter(token => token === 'continue')).toHaveLength(1);
-  expect(page.url()).not.toBe(beforeAnswer);
+  expect(replayHistory.filter(token => token === 'continue')).toHaveLength(0);
+  expect(new URL(page.url()).hash).not.toContain('continue');
   expect(pageErrors).toEqual([]);
 });
 

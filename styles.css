@@ -280,16 +280,23 @@ body.dev {
 
                 #project-analysis-summary {
                     grid-row: 1;
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    gap: 0.75em;
+                    display: grid;
+                    gap: 0.3em;
                     min-width: 0;
                     padding: 0.4em 0.6em;
                     box-sizing: border-box;
                     border-bottom: 1px solid var(--mix-80);
                     background: var(--mix-95);
                     font-size: 0.82em;
+
+                    .development-title-row {
+                        min-width: 0;
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        gap: 0.75em;
+                        flex-wrap: wrap;
+                    }
 
                     #project-analysis-status {
                         min-width: 0;
@@ -304,6 +311,14 @@ body.dev {
                         gap: 0.25em 0.7em;
                     }
 
+                    .project-analysis-pages + .project-analysis-choices::before,
+                    .project-analysis-choices ~ .project-analysis-count:not([hidden])::before {
+                        content: '·';
+                        margin-right: 0.45em;
+                        color: var(--mix-60);
+                        font-weight: 400;
+                    }
+
                     #project-analysis-counts[hidden] {
                         display: none;
                     }
@@ -313,6 +328,9 @@ body.dev {
 
                     .project-analysis-title {
                         font-weight: 600;
+                        font-size: 1.08em;
+                        min-width: 0;
+                        overflow-wrap: anywhere;
                     }
 
                     .project-analysis-errors,
@@ -350,6 +368,7 @@ body.dev {
                         margin: 0;
                         padding: 0.3em 0.55em;
                         font-size: 0.95em;
+                        color: var(--mix-40);
                     }
 
                 }
@@ -454,19 +473,11 @@ body.dev {
                     .problem-row-heading {
                         min-width: 0;
                         display: grid;
-                        grid-template-columns: minmax(0, 1fr) auto;
+                        grid-template-columns: minmax(0, 1fr);
                         align-items: start;
                         gap: 0.25em 0.45em;
                     }
                     .problem-details { min-width: 0; padding: 0 0.5em 0.4em 2.1em; }
-                    .problem-open-source {
-                        flex: none;
-                        margin: 0.35em 0.5em 0 0;
-                        font-size: 0.78em;
-                        white-space: nowrap;
-                        text-decoration: none;
-                    }
-                    .problem-open-source:hover { text-decoration: underline; }
                     .problem-source-host, .problem-source-note, .problem-source-snippet,
                     .problem-source-snippet code, .problem-source-snippet span {
                         font: 0.78rem/1.35 'IBM Plex Mono', monospace;

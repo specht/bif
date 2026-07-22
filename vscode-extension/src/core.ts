@@ -19,6 +19,7 @@ export interface PublishedProjectAnalysis {
   publication: any;
   serialized: string;
   contentHash: string;
+  analysisHash: string;
   summary: any;
   outputPath: string;
   published: boolean;

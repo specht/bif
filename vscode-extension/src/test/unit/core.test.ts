@@ -66,7 +66,7 @@ test("scheduler serializes work and reruns after a burst", async () => {
 test("extension adapter delegates currentness and accepts only the latest shared result", async () => {
   let received: any;
   const sharedResult = {
-    analysis: { diagnostics: [] }, publication: {}, serialized: "{}\n", contentHash: "a".repeat(64),
+    analysis: { diagnostics: [] }, publication: {}, serialized: "{}\n", contentHash: "a".repeat(64), analysisHash: "b".repeat(64),
     summary: {}, outputPath: "/workspace/.story-tools/analysis.json", published: true, stale: false,
   };
   const current = await publishCurrentGeneration(async (root, options) => {

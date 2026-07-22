@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import storyAnalyzer from '../tools/lib/story-analyzer.js';
 import publicationTools from '../tools/lib/browser-analysis-publication.js';
 
@@ -7,15 +8,24 @@ const { analyzeStory } = storyAnalyzer;
 const { buildBrowserAnalysisPublication } = publicationTools;
 const completeRoot = path.join(process.cwd(), 'test-fixtures/authoring-graph/complete-project');
 const escapingRoot = path.join(process.cwd(), 'test-fixtures/authoring-graph/escaping');
+const brokenEntryRoot = path.join(process.cwd(), 'test-fixtures/broken-entry');
 let complete;
 let hostile;
+let brokenEntry;
 
 test.beforeAll(async () => {
   complete = buildBrowserAnalysisPublication(await analyzeStory(completeRoot));
   hostile = buildBrowserAnalysisPublication(await analyzeStory(escapingRoot));
+  brokenEntry = buildBrowserAnalysisPublication(await analyzeStory(brokenEntryRoot));
 });
 
 async function configure(page, fixturePath, publicationProvider) {
+  if (fixturePath === 'test-fixtures/authoring-graph/complete-project/pages') {
+    await page.route(/\/test-fixtures\/authoring-graph\/complete-project\/pages\/1\.md\?/, async route => {
+      const source = await (await import('node:fs/promises')).readFile(path.join(completeRoot, 'pages/1.md'), 'utf8');
+      return route.fulfill({ contentType: 'text/markdown', body: source.replace('broken +', '2 + 3').replace('condition="has_key"', 'condition="false"') });
+    });
+  }
   await page.route(/\/config\.js\?.*/, route => route.fulfill({
     contentType: 'text/javascript',
     body: `export const path = ${JSON.stringify(fixturePath)};`,
@@ -37,6 +47,66 @@ function snapshot(page) {
     scroll: document.querySelector('#game_pane').scrollTop,
   }));
 }
+
+test('broken entry passage keeps the complete development shell alive across reload', async ({ page }) => {
+  let publication = brokenEntry;
+  let entrySource = await readFile(path.join(brokenEntryRoot, 'pages/1.md'), 'utf8');
+  await configure(page, 'test-fixtures/broken-entry/pages', () => publication);
+  await page.route(/\/pages\/1\.md$/, async route => route.fulfill({
+    contentType: 'text/markdown',
+    body: entrySource,
+  }));
+  await page.route(/\/test-fixtures\/broken-entry\/pages\/1\.md\?/, async route => route.fulfill({
+    contentType: 'text/markdown',
+    body: entrySource,
+  }));
+  await page.goto('/?mode=dev');
+
+  await expect(page).toHaveTitle('Broken entry fixture');
+  await expect(page.locator('.development-title-row')).toBeVisible();
+  await expect(page.locator('.development-title-row #bu_reset_game')).toBeVisible();
+  await expect(page.locator('#project-analysis-status')).toBeVisible();
+  await expect(page.locator('#graph-container')).toBeVisible();
+  await expect(page.locator('#graph-container svg')).toHaveCount(1);
+  await expect(page.locator('#development-inspector')).toBeVisible();
+  await expect(page.getByRole('tab', { name: /Problems/ })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'State' })).toBeVisible();
+  await expect(page.locator('.problem-message')).toContainText('Assigning to rvalue (line 8)');
+  await expect(page.locator('.problem-source-host')).toContainText('crew_count = 12;     1 = 2;');
+  await expect(page.locator('#content .story-error')).toHaveCount(1);
+  await expect(page.locator('#content .story-error')).toContainText('There is a script error in test-fixtures/broken-entry/pages/1.md on line 8.');
+  await expect(page.locator('#content')).not.toContainText(/later prose|Forbidden later choice|Assigning to rvalue|SyntaxError|ReferenceError|\(2:21\)/);
+  await expect(page.locator('#content .story-passage')).toHaveCount(0);
+  await expect(page.locator('nav > #bu_reset_game')).toHaveCount(0);
+  expect(await page.locator('#state-container').evaluate(element => element.parentElement.id)).toBe('development-state');
+  expect(await page.evaluate(() => [...document.body.children].some(element => element.textContent.trim() === '{}'))).toBe(false);
+  await expect(page.locator('#fatal-application-error')).toHaveCount(0);
+
+  await page.getByRole('tab', { name: 'State' }).click();
+  await page.getByRole('button', { name: 'Collapse' }).click();
+  const savedHash = new URL(page.url()).hash;
+  await page.reload();
+  await expect(page.locator('#graph-container svg')).toHaveCount(1);
+  await expect(page.locator('#content .story-error')).toHaveCount(1);
+  await expect(page.locator('#development-inspector')).toHaveClass(/collapsed/);
+  await expect(page.getByRole('tab', { name: 'State' })).toHaveAttribute('aria-selected', 'true');
+  expect(new URL(page.url()).hash).toBe(savedHash);
+  await expect(page.locator('#fatal-application-error')).toHaveCount(0);
+
+  entrySource = entrySource.replace('crew_count = 12;     1 = 2;', 'crew_count = 12;');
+  publication = {
+    ...brokenEntry,
+    analysisHash: 'f'.repeat(64),
+    summary: { ...brokenEntry.summary, errors: 0 },
+    diagnostics: [],
+  };
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Broken entry passage' })).toBeVisible();
+  await expect(page.locator('#content .story-error')).toHaveCount(0);
+  await expect(page.locator('#content')).toContainText('This later prose must not appear.');
+  await expect(page.getByRole('link', { name: 'Forbidden later choice' })).toBeVisible();
+  expect(new URL(page.url()).hash).toBe(savedHash);
+});
 
 test('active analysis preserves the compact visual contract and prevents recursive crawling', async ({ page }) => {
   const markdown = [];
@@ -93,6 +163,7 @@ test('summary hides zero metrics and Problems group, sort, and wrap by file', as
   const clean = {
     ...complete,
     contentHash: 'c'.repeat(64),
+    analysisHash: 'c'.repeat(64),
     summary: { ...complete.summary, errors: 0, warnings: 0, unreachablePages: 0, missingTargets: 0 },
     diagnostics: [],
   };
@@ -100,7 +171,9 @@ test('summary hides zero metrics and Problems group, sort, and wrap by file', as
   await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => publication);
   await page.goto('/?dev');
   const summary = page.locator('#project-analysis-counts');
-  await expect(summary).toContainText('Start of the authoring map');
+  await expect(page.locator('.development-title-row')).toContainText('Start of the authoring map');
+  await expect(page.locator('.development-title-row')).toContainText('Spiel neu starten');
+  await expect(summary).not.toContainText('Start of the authoring map');
   await expect(summary).toContainText('No problems');
   for (const metric of ['errors', 'warnings', 'unreachable', 'missing']) await expect(page.locator(`.project-analysis-${metric}`)).toBeHidden();
 
@@ -117,16 +190,17 @@ test('summary hides zero metrics and Problems group, sort, and wrap by file', as
 });
 
 test('Problems formats semantic diagnostics with page-level lines', async ({ page }) => {
-  const diagnostic = { ...complete.diagnostics[0], file: 'pages/1.md', line: 16, column: 21, message: 'Unexpected token' };
+  const diagnostic = { ...complete.diagnostics[0], file: 'pages/1.md', line: 16, column: 21, message: 'Assigning to rvalue', scriptIndex: 1, scriptLine: 2, scriptColumn: 21 };
   const unlocated = { severity: 'warning', code: 'project-note', file: '', message: 'Meaningful (context)' };
-  const publication = { ...complete, contentHash: 'd'.repeat(64), diagnostics: [diagnostic, unlocated] };
+  const publication = { ...complete, analysisHash: 'd'.repeat(64), diagnostics: [diagnostic, unlocated] };
   await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => publication);
   await page.goto('/?dev');
-  const row = page.locator('.project-problem', { hasText: 'Unexpected token' });
-  await expect(row).toContainText('Unexpected token (line 16)');
-  await expect(row).not.toContainText('(2:20)');
+  const row = page.locator('.project-problem', { hasText: 'Assigning to rvalue' });
+  await expect(row).toContainText('Assigning to rvalue (line 16)');
+  await expect(row).not.toContainText('(2:21)');
+  await expect(row).not.toContainText('Script 1');
   await expect(row).not.toContainText('pages/1.md');
-  await expect(row).toHaveAttribute('title', 'pages/1.md, line 16, column 21: Unexpected token');
+  await expect(row).toHaveAttribute('title', 'pages/1.md, line 16, column 21: Assigning to rvalue');
   await expect(page.locator('.problem-file-group', { hasText: 'pages/1.md' })).toContainText('pages/1.md');
   await expect(page.locator('.project-problem', { hasText: 'Meaningful (context)' })).not.toContainText('(line undefined)');
   await expect(page.locator('.problem-location')).toHaveCount(0);
@@ -156,52 +230,38 @@ test('problem source is immediate, cached per file, marked, highlighted, and saf
   expect(new Set(typography).size).toBe(1);
   await row.click();
   expect(sourceRequests).toBe(1);
-  const openSource = row.locator('xpath=..').locator('.problem-open-source');
-  await expect(openSource).toHaveAttribute('href', /vscode:\/\/gymnasiumsteglitz\.bif-authoring-tools\/open-source\?file=pages%2F1\.md/);
-  await expect(openSource).toHaveAttribute('title', 'Open in VS Code');
+  await expect(row.locator('xpath=..').locator('.problem-open-source')).toHaveCount(0);
   await expect(row).not.toHaveAttribute('href');
   await expect(page.getByRole('button', { name: 'Copy location' })).toHaveCount(0);
 });
 
-test('Problems heading and labeled VS Code action never collide', async ({ page }) => {
+test('Problems rows have no editor action column and never overflow', async ({ page }) => {
   await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => complete);
   await page.goto('/?dev');
   const item = page.locator('.problem-file-rows > li').first();
-  const action = item.locator('.problem-open-source');
-  await expect(action).toContainText('VS Code');
-  await expect(action.locator('svg.icon use')).toHaveAttribute('href', '/assets/icons.svg#icon-brand-vscode');
-  await expect(action).toHaveAttribute('aria-label', /Open pages\/1\.md at line \d+ in VS Code/);
-  await expect(action).toHaveAttribute('title', 'Open in VS Code');
+  await expect(item.locator('.problem-open-source')).toHaveCount(0);
 
   for (const width of [1280, 760]) {
     await page.setViewportSize({ width, height: 720 });
     const geometry = await item.evaluate(element => {
       const rectangle = selector => element.querySelector(selector).getBoundingClientRect().toJSON();
-      const overlaps = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-      const message = rectangle('.problem-message');
-      const severity = rectangle('.problem-severity');
-      const action = rectangle('.problem-open-source');
+      const heading = element.querySelector('.problem-row-heading');
       const panel = document.querySelector('#project-problems');
-      return { messageAction: overlaps(message, action), severityAction: overlaps(severity, action), overflow: panel.scrollWidth > panel.clientWidth };
+      return { columns: getComputedStyle(heading).gridTemplateColumns.split(' ').length, overflow: panel.scrollWidth > panel.clientWidth };
     });
-    expect(geometry).toEqual({ messageAction: false, severityAction: false, overflow: false });
+    expect(geometry).toEqual({ columns: 1, overflow: false });
   }
 
-  const before = await snapshot(page);
-  await action.evaluate(element => element.addEventListener('click', event => event.preventDefault(), { once: true }));
-  await action.click();
-  await expect(item.locator('.project-problem')).not.toHaveClass(/selected/);
-  const after = await snapshot(page);
-  expect({ ...after, focus: before.focus }).toEqual(before);
+  await item.locator('.project-problem').click();
+  await expect(item.locator('.project-problem')).toHaveClass(/selected/);
 });
 
 test('shared icons align with labels and clean text remains neutral', async ({ page }) => {
   await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => complete);
   await page.goto('/?dev');
   await expect(page.locator('.project-analysis-errors')).toBeVisible();
-  await expect(page.locator('.problem-open-source').first()).toBeVisible();
   const aligned = await page.evaluate(() => {
-    const selectors = ['.project-analysis-errors', '.problem-severity', '.problem-open-source'];
+    const selectors = ['.project-analysis-errors', '.problem-severity'];
     return selectors.map(selector => {
       const pair = document.querySelector(selector);
       const icon = pair.querySelector('.icon').getBoundingClientRect();
@@ -211,7 +271,7 @@ test('shared icons align with labels and clean text remains neutral', async ({ p
   });
   expect(aligned.every(item => item.difference <= 2 && item.ariaHidden === 'true')).toBe(true);
 
-  const clean = { ...complete, contentHash: 'e'.repeat(64), summary: { ...complete.summary, errors: 0, warnings: 0, unreachablePages: 0, missingTargets: 0 }, diagnostics: [] };
+  const clean = { ...complete, analysisHash: 'e'.repeat(64), summary: { ...complete.summary, errors: 0, warnings: 0, unreachablePages: 0, missingTargets: 0 }, diagnostics: [] };
   await page.route(/\/\.story-tools\/analysis\.json\?v=\d+$/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(clean) }));
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(page.locator('.project-analysis-clean')).toBeVisible();
@@ -301,7 +361,7 @@ test('parallel runtime choices map to distinct analysis edge identities', async 
   await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => parallel);
   await page.route(/\/complete-project\/pages\/1\.md\?.*/, async route => {
     const response = await route.fetch();
-    await route.fulfill({ response, body: (await response.text()).replace(' condition="has_key"', '') });
+    await route.fulfill({ response, body: (await response.text()).replace('broken +', '2 + 3').replace(' condition="has_key"', '') });
   });
   await page.goto('/?dev');
   const edges = complete.edges.filter(edge => edge.source === '1' && edge.target === '2');
@@ -354,7 +414,7 @@ test('structural refresh replaces one SVG without replaying story state', async 
   await expect(page.locator('#node_3')).toHaveClass(/graph-selected/);
   const before = await snapshot(page);
   const added = { ...complete.nodes[0], nodeId: 'node-page-6578747261', pageId: 'extra', graphLabel: 'Fresh page', start: false, group: '' };
-  publication = { ...complete, contentHash: 'b'.repeat(64), summary: { ...complete.summary, pages: complete.summary.pages + 1 }, nodes: [...complete.nodes, added] };
+  publication = { ...complete, analysisHash: 'b'.repeat(64), summary: { ...complete.summary, pages: complete.summary.pages + 1 }, nodes: [...complete.nodes, added] };
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(page.locator('#node_extra')).toBeVisible();
   await expect(page.locator('#node_3')).toHaveClass(/graph-selected/);

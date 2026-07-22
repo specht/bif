@@ -66,6 +66,19 @@ test("Acorn normalization removes only its own parser-location suffix", () => {
   });
 });
 
+test("Assigning to rvalue publishes a semantic message and structured local coordinates", async () => {
+  const result = await analyzeStory(fixture("assigning-rvalue"));
+  const item = result.diagnostics.find(diagnostic => diagnostic.code === "script-syntax");
+  assert.equal(item.message, "Assigning to rvalue");
+  assert.equal(item.file, "pages/1.md");
+  assert.equal(item.line, 16);
+  assert.equal(item.column, 22);
+  assert.equal(item.scriptIndex, 1);
+  assert.equal(item.scriptLine, 2);
+  assert.equal(item.scriptColumn, 21);
+  assert.doesNotMatch(item.message, /Script 1|\(2:21\)/);
+});
+
 test("local image existence, traversal, and missing alt text are checked", async () => {
   const result = await analyzeStory(fixture("missing-image"));
   assert.ok(result.diagnostics.some((item) => item.code === "missing-image" && item.message.includes("assets/missing.png")));
@@ -87,18 +100,20 @@ test("the active story can be analyzed without executing story code", async () =
 });
 
 test("CLI JSON is machine-readable and failures set a nonzero exit status", () => {
-  const valid = spawnSync(process.execPath, ["tools/check-story.js", "--project", fixture("valid"), "--json"], { cwd: repository, encoding: "utf8" });
+  const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
+  const valid = spawnSync(process.execPath, ["tools/check-story.js", "--project", fixture("valid"), "--json"], { cwd: repository, encoding: "utf8", env });
   assert.ifError(valid.error);
   assert.equal(valid.status, 0, valid.stderr);
   const parsed = JSON.parse(valid.stdout);
   assert.equal(parsed.version, 1);
   assert.equal(parsed.summary.pages, 2);
-  const invalid = spawnSync(process.execPath, ["tools/check-story.js", "--project", fixture("missing-link"), "--json"], { cwd: repository, encoding: "utf8" });
+  const invalid = spawnSync(process.execPath, ["tools/check-story.js", "--project", fixture("missing-link"), "--json"], { cwd: repository, encoding: "utf8", env });
   assert.ifError(invalid.error);
   assert.equal(invalid.status, 1);
   assert.equal(JSON.parse(invalid.stdout).diagnostics[0].code, "missing-page");
-  const warning = spawnSync(process.execPath, ["tools/check-story.js", "--project", fixture("unreachable")], { cwd: repository, encoding: "utf8" });
-  const strict = spawnSync(process.execPath, ["tools/check-story.js", "--project", fixture("unreachable"), "--strict"], { cwd: repository, encoding: "utf8" });
+  const warning = spawnSync(process.execPath, ["tools/check-story.js", "--project", fixture("unreachable")], { cwd: repository, encoding: "utf8", env });
+  const strict = spawnSync(process.execPath, ["tools/check-story.js", "--project", fixture("unreachable"), "--strict"], { cwd: repository, encoding: "utf8", env });
   assert.equal(warning.status, 0);
   assert.equal(strict.status, 1);
 });

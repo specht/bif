@@ -12,6 +12,9 @@ function sanitizeDiagnostic(item) {
     message: item.message,
   };
   if (item.target !== undefined) result.target = item.target;
+  for (const field of ["scriptIndex", "scriptLine", "scriptColumn", "expressionLine", "expressionColumn", "rawMessage", "kind"]) {
+    if (item[field] !== undefined) result[field] = item[field];
+  }
   return result;
 }
 
@@ -74,10 +77,14 @@ function buildBrowserAnalysisPublication(analysis) {
     })),
     diagnostics: model.diagnostics.map(sanitizeDiagnostic),
   };
-  const canonicalContent = canonicalJson(content);
+  const contentHash = /^[a-f0-9]{64}$/.test(analysis.contentHash || "")
+    ? analysis.contentHash
+    : crypto.createHash("sha256").update(canonicalJson({ project: analysis.project, graph: analysis.graph })).digest("hex");
+  const analysisHash = crypto.createHash("sha256").update(canonicalJson(content)).digest("hex");
   const publication = {
     ...content,
-    contentHash: crypto.createHash("sha256").update(canonicalContent).digest("hex"),
+    contentHash,
+    analysisHash,
   };
   validateBrowserAnalysisPublication(publication);
   return publication;
@@ -89,6 +96,7 @@ function validateBrowserAnalysisPublication(publication) {
     if (!Array.isArray(publication[field])) throw new Error(`Browser analysis ${field} must be an array`);
   }
   if (!/^[a-f0-9]{64}$/.test(publication.contentHash)) throw new Error("Browser analysis contentHash must be SHA-256");
+  if (!/^[a-f0-9]{64}$/.test(publication.analysisHash)) throw new Error("Browser analysis analysisHash must be SHA-256");
   const locations = [
     ...publication.nodes.map(node => node.source),
     ...publication.edges,

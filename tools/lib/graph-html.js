@@ -1,25 +1,23 @@
-const { sourceLocation, vscodeUri } = require("./source-links");
+const { sourceLocation } = require("./source-links");
 
 function safeJson(value) {
   return JSON.stringify(value).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
 }
 
-function withSourceLinks(model, projectRoot) {
+function withSourceLocations(model) {
   const copy = JSON.parse(JSON.stringify(model));
   for (const node of copy.nodes) if (node.source) {
     node.source.location = sourceLocation(node.source);
-    node.source.vscodeUri = vscodeUri(projectRoot, node.source);
   }
   for (const edge of copy.edges) {
     const source = { file: edge.file, line: edge.line, column: edge.column };
     edge.location = sourceLocation(source);
-    edge.vscodeUri = vscodeUri(projectRoot, source);
   }
   return copy;
 }
 
 function generateHtml({ model, svg, projectRoot }) {
-  const data = safeJson(withSourceLinks(model, projectRoot));
+  const data = safeJson(withSourceLocations(model));
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -45,7 +43,7 @@ function generateHtml({ model, svg, projectRoot }) {
 </main>
 <script id="graph-data" type="application/json">${data}</script>
 <script>
-(()=>{'use strict';const data=JSON.parse(document.getElementById('graph-data').textContent);const byId=id=>document.getElementById(id);const canvas=byId('canvas'),details=byId('details'),search=byId('search'),statusFilter=byId('status-filter'),groupFilter=byId('group-filter');const graph=canvas.querySelector('g.graph'),baseTransform=graph.getAttribute('transform')||'';let scale=1,x=0,y=0,selected=null,matches=[],matchIndex=-1;const h=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const locationHtml=item=>item.location?'<div class="source"><span class="location">'+h(item.location)+'</span><a href="'+h(item.vscodeUri)+'">Open in VS Code</a><button class="copy-location" type="button" data-location="'+h(item.location)+'">Copy location</button></div>':'';const diagnosticsHtml=list=>list.length?'<h3>Diagnostics</h3>'+list.map(d=>'<div class="diagnostic '+h(d.severity)+'"><strong>'+h(d.severity.toUpperCase()+' · '+d.code)+'</strong><br>'+h(d.message)+'</div>').join(''):'';
+(()=>{'use strict';const data=JSON.parse(document.getElementById('graph-data').textContent);const byId=id=>document.getElementById(id);const canvas=byId('canvas'),details=byId('details'),search=byId('search'),statusFilter=byId('status-filter'),groupFilter=byId('group-filter');const graph=canvas.querySelector('g.graph'),baseTransform=graph.getAttribute('transform')||'';let scale=1,x=0,y=0,selected=null,matches=[],matchIndex=-1;const h=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const locationHtml=item=>item.location?'<div class="source"><span class="location">'+h(item.location)+'</span><button class="copy-location" type="button" data-location="'+h(item.location)+'">Copy location</button></div>':'';const diagnosticsHtml=list=>list.length?'<h3>Diagnostics</h3>'+list.map(d=>'<div class="diagnostic '+h(d.severity)+'"><strong>'+h(d.severity.toUpperCase()+' · '+d.code)+'</strong><br>'+h(d.message)+'</div>').join(''):'';
 function applyView(){graph.setAttribute('transform',baseTransform+' translate('+x+' '+y+') scale('+scale+')');canvas.dataset.viewState=[scale.toFixed(3),Math.round(x),Math.round(y)].join(',')}function choose(item){if(selected)byId(selected)?.classList.remove('selected');selected=item.nodeId||item.edgeId;byId(selected)?.classList.add('selected');if(item.kind==='page')showPage(item);else if(item.kind==='missing')showMissing(item);else showEdge(item)}
 function showPage(node){const outgoing=data.edges.filter(e=>e.source===node.pageId);details.innerHTML='<h2>Page '+h(node.pageId)+'</h2><dl><dt>Path</dt><dd>'+h(node.path)+'</dd><dt>Group</dt><dd>'+h(node.group||'None')+'</dd><dt>Graph label</dt><dd>'+h(node.graphLabel||'None')+'</dd><dt>Reachability</dt><dd>'+h(node.reachable?'Reachable':'Unreachable')+'</dd><dt>Links</dt><dd>'+node.incomingCount+' incoming, '+node.outgoingCount+' outgoing</dd><dt>Content</dt><dd>'+node.counts.scripts+' scripts, '+node.counts.conditions+' conditions, '+node.counts.expressions+' expressions, '+node.counts.images+' images</dd></dl>'+locationHtml(node.source||{})+diagnosticsHtml(node.diagnostics)+'<h3>Outgoing choices</h3>'+(outgoing.length?outgoing.map(e=>'<div class="choice"><button type="button" data-edge="'+h(e.edgeId)+'">'+h(e.text||e.target)+'</button><div>Target: '+h(e.target)+(e.label?' · Label: '+h(e.label):'')+(e.condition?' · Condition: '+h(e.condition):'')+'</div><span class="location">'+h(e.location)+'</span></div>').join(''):'<p class="empty">No outgoing choices.</p>');bindDetails()}
 function showEdge(edge){details.innerHTML='<h2>Choice '+h(edge.source)+' → '+h(edge.target)+'</h2><dl><dt>Text</dt><dd>'+h(edge.text||'None')+'</dd><dt>Graph label</dt><dd>'+h(edge.label||'None')+'</dd><dt>Condition</dt><dd>'+h(edge.condition||'None')+'</dd><dt>Broken target</dt><dd>'+h(edge.broken?'Yes':'No')+'</dd></dl>'+locationHtml(edge)+diagnosticsHtml(edge.diagnostics);bindDetails()}
@@ -63,4 +61,4 @@ function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
 }
 
-module.exports = { generateHtml, safeJson, withSourceLinks };
+module.exports = { generateHtml, safeJson, withSourceLocations };
