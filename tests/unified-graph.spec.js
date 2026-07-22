@@ -152,11 +152,10 @@ test('one graph shows complete structure and contextual Problems', async ({ page
   await expect(page.locator('.problem-path').filter({ hasText: 'pages/1.md' })).not.toHaveCount(0);
   await expect(page.locator('#project-problems')).not.toContainText(process.cwd());
   const before = await snapshot(page);
-  await page.locator('.project-problem', { hasText: 'missing page' }).click();
+  await page.locator('.project-problem', { hasText: 'unreachable' }).click();
   await expect(page.locator('#node_99')).toHaveClass(/graph-selected/);
   const after = await snapshot(page);
-  expect({ ...after, focus: before.focus }).toEqual(before);
-  expect(after.focus).toContain('missing page');
+  expect(after).toEqual(before);
 });
 
 test('summary hides zero metrics and Problems sort and wrap as a flat list', async ({ page }) => {
@@ -172,7 +171,7 @@ test('summary hides zero metrics and Problems sort and wrap as a flat list', asy
   await page.goto('/?dev');
   const summary = page.locator('#project-analysis-counts');
   await expect(page.locator('.development-title-row')).toContainText('Start of the authoring map');
-  await expect(page.locator('.development-title-row')).toContainText('Spiel neu starten');
+  await expect(page.locator('.development-title-row')).toContainText('Restart');
   await expect(page.locator('.development-summary-items').first()).toContainText('Start of the authoring map');
   await expect(summary).toContainText('No problems');
   for (const metric of ['errors', 'warnings', 'unreachable', 'missing']) await expect(page.locator(`.project-analysis-${metric}`)).toBeHidden();
@@ -191,7 +190,7 @@ test('summary hides zero metrics and Problems sort and wrap as a flat list', asy
 });
 
 test('Problems formats semantic diagnostics with page-level lines', async ({ page }) => {
-  const diagnostic = { ...complete.diagnostics[0], file: 'pages/1.md', line: 16, column: 21, message: 'Assigning to rvalue', scriptIndex: 1, scriptLine: 2, scriptColumn: 21 };
+  const diagnostic = { ...complete.diagnostics[0], file: 'pages/1.md', line: 16, column: 21, message: 'Script 1: Assigning to rvalue (2:21)', scriptIndex: 1, scriptLine: 2, scriptColumn: 21 };
   const unlocated = { severity: 'warning', code: 'project-note', file: '', message: 'Meaningful (context)' };
   const publication = { ...complete, analysisHash: 'd'.repeat(64), diagnostics: [diagnostic, unlocated] };
   await configure(page, 'test-fixtures/authoring-graph/complete-project/pages', () => publication);
@@ -205,6 +204,20 @@ test('Problems formats semantic diagnostics with page-level lines', async ({ pag
   await expect(page.locator('.problem-file-group, .problem-file-header')).toHaveCount(0);
   await expect(page.locator('.project-problem', { hasText: 'Meaningful (context)' })).not.toContainText('(line undefined)');
   await expect(page.locator('.problem-location')).toHaveCount(0);
+});
+
+test('real bork publication and browser output keep parser-local context internal', async ({ page }) => {
+  const root = path.join(process.cwd(), 'test-fixtures/analyzer/bork-script');
+  const publication = buildBrowserAnalysisPublication(await analyzeStory(root));
+  const diagnostic = publication.diagnostics.find(item => item.code === 'script-syntax');
+  expect(diagnostic).toMatchObject({ message: 'Unexpected token', file: 'pages/1.md', line: 21, scriptIndex: 1, scriptLine: 3, scriptColumn: 9 });
+  await configure(page, 'test-fixtures/analyzer/bork-script/pages', () => publication);
+  await page.goto('/?dev');
+  const message = page.locator('.problem-message', { hasText: 'Unexpected token' });
+  await expect(message).toHaveText('Unexpected token (line 21)');
+  await expect(page.locator('#project-problems')).not.toContainText('Script 1');
+  await expect(page.locator('#project-problems')).not.toContainText('(3:9)');
+  await expect(page.locator('#content .story-error')).toHaveText('This passage could not be completed.See Problems below for details.');
 });
 
 test('problem source is immediate, cached per file, marked, highlighted, and safely rendered', async ({ page }) => {
@@ -254,8 +267,13 @@ test('Problems rows have no editor action column and never overflow', async ({ p
     expect(geometry.columns).toBe(3);
   }
 
-  await item.locator('.project-problem').click();
-  await expect(item.locator('.project-problem')).toHaveClass(/selected/);
+  const row = item.locator('.project-problem');
+  await expect(row).not.toHaveAttribute('role', 'button');
+  await expect(row).not.toHaveAttribute('tabindex');
+  const styles = await row.evaluate(element => ({ cursor: getComputedStyle(element).cursor, background: getComputedStyle(element).backgroundColor }));
+  await row.hover();
+  expect(await row.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(styles.background);
+  expect(styles.cursor).not.toBe('pointer');
 });
 
 test('shared icons align with labels and clean text remains neutral', async ({ page }) => {
@@ -308,6 +326,15 @@ test('authoring toolbar is compact, title-first, responsive, and typographically
   expect(desktop.row.height).toBeLessThan(38);
   expect(new Set(desktop.fonts).size).toBe(1);
   expect(new Set(desktop.lines).size).toBe(1);
+  await expect(page.locator('#graph-toolbar')).toHaveCount(0);
+  const actions = page.locator('.development-toolbar-actions');
+  await expect(actions.getByRole('button')).toHaveText(['Restart', 'Fit graph', 'Auto-follow']);
+  const actionGeometry = await actions.getByRole('button').evaluateAll(elements => elements.map(element => ({
+    height: element.getBoundingClientRect().height,
+    fontSize: getComputedStyle(element).fontSize,
+  })));
+  expect(Math.max(...actionGeometry.map(item => item.height)) - Math.min(...actionGeometry.map(item => item.height))).toBeLessThanOrEqual(1);
+  expect(new Set(actionGeometry.map(item => item.fontSize)).size).toBe(1);
 
   await page.setViewportSize({ width: 620, height: 720 });
   const narrow = await page.evaluate(() => ({

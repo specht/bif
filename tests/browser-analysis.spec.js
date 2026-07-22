@@ -685,7 +685,7 @@ test('summary is keyboard accessible and reduced-motion safe', async ({ page }) 
   await expect(stateTab).toBeVisible();
   await page.getByRole('link', { name: 'Take route B' }).focus();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Spiel neu starten' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Restart' })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Fit graph' })).toBeFocused();
   await page.keyboard.press('Tab');
@@ -720,7 +720,10 @@ test('graph viewport math keeps wheel and pinch focal points anchored', async ({
       { minWidth: 200, maxWidth: 4000 });
     const oldPinchWorld = viewport.clientPointToWorld(start, box, { x: 300, y: 200 });
     const newPinchWorld = viewport.clientPointToWorld(pinch, box, { x: 340, y: 225 });
-    return { before, after, restored, start, pinch, oldPinchWorld, newPinchWorld };
+    const visibleFollow = viewport.followViewBoxTarget({ x: 0, y: 0, width: 1000, height: 500 }, { x: 300, y: 180, width: 100, height: 50 });
+    const distantFollow = viewport.followViewBoxTarget({ x: 0, y: 0, width: 1000, height: 500 }, { x: 1200, y: 200, width: 100, height: 50 });
+    const oversizedFollow = viewport.followViewBoxTarget({ x: 0, y: 0, width: 200, height: 100 }, { x: 300, y: 100, width: 220, height: 80 }, { maxWidth: 600 });
+    return { before, after, restored, start, pinch, oldPinchWorld, newPinchWorld, visibleFollow, distantFollow, oversizedFollow };
   });
   expect(result.after.x).toBeCloseTo(result.before.x, 8);
   expect(result.after.y).toBeCloseTo(result.before.y, 8);
@@ -728,4 +731,9 @@ test('graph viewport math keeps wheel and pinch focal points anchored', async ({
   expect(result.pinch.width).toBeLessThan(result.start.width);
   expect(result.newPinchWorld.x).toBeCloseTo(result.oldPinchWorld.x, 8);
   expect(result.newPinchWorld.y).toBeCloseTo(result.oldPinchWorld.y, 8);
+  expect(result.visibleFollow).toBeNull();
+  expect(result.distantFollow.width).toBe(1000);
+  expect(result.distantFollow.x).toBeCloseTo(450, 8);
+  expect(result.oversizedFollow.width).toBeGreaterThan(200);
+  expect(result.oversizedFollow.width).toBeLessThanOrEqual(600);
 });

@@ -35,7 +35,8 @@ expose analyzer diagnostics and runtime state without covering the graph or
 changing the story session.
 
 The compact single-line authoring toolbar shows the story-derived title first,
-then page count, choice count, and status, with restart aligned at the right. It
+then page count, choice count, and status, with **Restart**, **Fit graph**, and
+**Auto-follow** grouped at the right. It
 wraps without dropping the title on narrow screens and uses one shared chrome
 font size and line height. Zero-valued problem metrics are omitted; a clean project is marked
 with a green Tabler check icon while the words `No problems` retain the normal
@@ -50,8 +51,8 @@ page-level form `(line N)` instead of embedded-parser coordinates. The inspector
 disabled when reduced motion is requested, and its horizontal separator can be
 dragged or adjusted with Arrow keys (Shift uses larger steps). In development
 mode the restart control lives in the top toolbar instead of covering the
-inspector. Problems do not open an external editor or protocol; selecting one
-selects its associated graph item. Shared icon-and-text controls use consistent
+inspector. Problems are static, selectable text: they have no row activation,
+hover action, external editor protocol, or graph-selection side effect. Shared icon-and-text controls use consistent
 center alignment. Problems and State use a connected ARIA tab strip, and the
 Collapse/Expand control uses the shared chevron icons. Use the visible relative path and line with the editor's file
 and line navigation when source editing is needed. Pointer graph navigation
@@ -61,10 +62,11 @@ graph and transcript navigation retain a visible passage focus indicator.
 Graph navigation uses one SVG `viewBox` model: wheel/trackpad zoom remains
 anchored below the pointer, pointer drag pans, and touch supports one-finger pan
 and midpoint-anchored two-finger pinch. The graph toolbar provides **Fit graph**
-and a persisted, initially-off **Auto-follow** toggle. Follow uses a short
-cancelable transition to keep story progress comfortably visible; Fit or any
-manual pan/zoom disables it. Programmatic movement is immediate when reduced
-motion is requested.
+and a persisted, initially-off **Auto-follow** toggle. Follow uses a 15% inner
+viewport margin and a short cancelable transition, preserving zoom and moving
+only enough to make the complete current node comfortably visible. Fit or any
+manual pan/zoom disables and cancels it. Programmatic movement is immediate
+when reduced motion is requested.
 
 The BIF VS Code extension generates the snapshot after analysis. Without the
 extension, run `npm run analysis -- --watch` while editing. After loading or

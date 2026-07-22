@@ -276,7 +276,7 @@ body.dev {
                     min-height: 0;
                     flex: 1;
                     display: grid;
-                    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+                    grid-template-rows: auto auto minmax(0, 1fr) auto;
                     box-sizing: border-box;
                 }
 
@@ -302,9 +302,10 @@ body.dev {
 
                     .development-summary-items {
                         min-width: 0;
+                        flex: 1 1 auto;
                         display: flex;
                         align-items: center;
-                        flex-wrap: wrap;
+                        flex-wrap: nowrap;
                         gap: 0.25em 0.7em;
                     }
 
@@ -318,8 +319,9 @@ body.dev {
                     #project-analysis-counts {
                         display: flex;
                         align-items: baseline;
-                        flex-wrap: wrap;
+                        flex-wrap: nowrap;
                         gap: 0.25em 0.7em;
+                        white-space: nowrap;
                     }
 
                     .project-analysis-title + #project-analysis-counts::before {
@@ -378,6 +380,16 @@ body.dev {
                         display: flex;
                         align-items: center;
                         gap: 0.4em;
+
+                        button {
+                            min-height: 2em;
+                            margin: 0;
+                            padding: 0.3em 0.55em;
+                            font: inherit;
+                            line-height: inherit;
+                        }
+
+                        button.active { background: var(--mix-85); font-weight: 600; }
                     }
 
                     .story-restart {
@@ -394,7 +406,7 @@ body.dev {
                 }
 
                 #limited-analysis-notice {
-                    grid-row: 3;
+                    grid-row: 2;
                     padding: 0.45em 0.65em;
                     border-bottom: 1px solid #9a6700;
                     background: #fff4ce;
@@ -410,7 +422,7 @@ body.dev {
                 #development-inspector {
                     font-size: var(--authoring-ui-font-size);
                     line-height: var(--authoring-ui-line-height);
-                    grid-row: 5;
+                    grid-row: 4;
                     height: var(--inspector-height, 224px);
                     min-height: 0;
                     display: grid;
@@ -480,16 +492,18 @@ body.dev {
                         min-width: 0;
                     }
 
-                    .problem-item { min-width: 0; list-style: none; }
+                    .problem-item { min-width: 0; max-width: 100%; overflow: hidden; list-style: none; }
 
                     .problem-row-heading {
                         min-width: 0;
+                        max-width: 100%;
+                        overflow: hidden;
                         display: grid;
                         grid-template-columns: minmax(0, 1fr);
                         align-items: start;
                         gap: 0.25em 0.45em;
                     }
-                    .problem-details { min-width: 0; padding: 0 0.5em 0.4em 2.35em; }
+                    .problem-details { min-width: 0; max-width: 100%; overflow: hidden; box-sizing: border-box; padding: 0 0.5em 0.4em 2.35em; }
                     .problem-source-host, .problem-source-note, .problem-source-snippet,
                     .problem-source-snippet code, .problem-source-snippet span {
                         font-family: 'IBM Plex Mono', monospace;
@@ -543,7 +557,6 @@ body.dev {
                         .problem-severity { display: inline-flex; align-items: center; font-weight: 600; }
                         .problem-path { min-width: 0; overflow-wrap: anywhere; color: var(--mix-40); }
                         .problem-message { min-width: 0; }
-                        &:hover, &:focus-visible, &.selected { background: var(--mix-85); }
                     }
                 }
 
@@ -554,7 +567,7 @@ body.dev {
                 }
 
                 #graph-container {
-                    grid-row: 4;
+                    grid-row: 3;
                     box-shadow: 0.1em 0 0.1em rgba(0, 0, 0, 0.1);
                     min-width: 0;
                     min-height: 0;
@@ -609,24 +622,10 @@ body.dev {
                     }
                 }
 
-                #graph-toolbar {
-                    grid-row: 2;
-                    display: flex;
-                    justify-content: flex-end;
-                    gap: 0.35em;
-                    padding: 0.25em 0.45em;
-                    border-bottom: 1px solid var(--mix-80);
-                    background: var(--mix-95);
-                    font-size: var(--authoring-ui-font-size);
-                    line-height: var(--authoring-ui-line-height);
-
-                    button { font: inherit; padding: 0.25em 0.5em; }
-                    button.active { background: var(--mix-85); font-weight: 600; }
-                }
-
                 @media (max-width: 700px) {
-                    #project-analysis-summary .development-title-row { align-items: flex-start; }
-                    #project-analysis-summary .development-summary-items { flex: 1 1 auto; }
+                    #project-analysis-summary .development-title-row { align-items: flex-start; flex-wrap: wrap; }
+                    #project-analysis-summary .development-summary-items { flex: 1 1 auto; flex-wrap: wrap; }
+                    #project-analysis-summary #project-analysis-counts { flex-wrap: wrap; }
                     #project-analysis-summary .project-analysis-title { max-width: 100%; }
                     #project-problems .project-problem {
                         grid-template-columns: 1.25em minmax(0, 1fr);
