@@ -1,6 +1,29 @@
 :root {
+  color-scheme: light dark;
+
   --bg-color: #fff;
   --fg-color: #333;
+
+  --surface-1: #fff;
+  --surface-2: #f7f7f7;
+  --surface-3: #ededed;
+  --border-color: #c9c9c9;
+  --border-strong: #999;
+  --muted-color: #666;
+  --shadow-color: rgba(0, 0, 0, 0.16);
+
+  --error-color: #b42318;
+  --warning-color: #8a5a00;
+  --success-color: #18794e;
+
+  --notice-bg: #fff4ce;
+  --notice-border: #9a6700;
+  --notice-fg: #4d3600;
+
+  --graph-active-color: #111;
+  --graph-error-color: #b42318;
+  --graph-warning-color: #9a6700;
+
   --choice-gap: 0.625rem;
   --choice-result-gap: 0.375rem;
   --turn-to-live-set-gap: 1.25rem;
@@ -8,8 +31,28 @@
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg-color: #222;
-        --fg-color: #eee;
+        --bg-color: #1f1f1f;
+        --fg-color: #ededed;
+
+        --surface-1: #252525;
+        --surface-2: #2c2c2c;
+        --surface-3: #363636;
+        --border-color: #555;
+        --border-strong: #777;
+        --muted-color: #b6b6b6;
+        --shadow-color: rgba(0, 0, 0, 0.55);
+
+        --error-color: #ff7b72;
+        --warning-color: #f2cc60;
+        --success-color: #56d364;
+
+        --notice-bg: #3b3218;
+        --notice-border: #d6a419;
+        --notice-fg: #ffe7a3;
+
+        --graph-active-color: #f2f2f2;
+        --graph-error-color: #ff7b72;
+        --graph-warning-color: #f2cc60;
     }
 }
 
@@ -42,7 +85,7 @@ nav {
 
 body {
     background-color: var(--bg-color);
-    color: inherit;
+    color: var(--fg-color);
     margin: 0;
     font-family: "IBM Plex Sans", sans-serif;
     font-optical-sizing: auto;
@@ -89,8 +132,8 @@ img {
 }
 
 blockquote {
-    background-color: var(--mix-95);
-    border-left: 4px solid var(--mix-85);
+    background-color: var(--surface-2);
+    border-left: 4px solid var(--border-color);
     margin: 0;
     padding: 0.1em 1em;
     font-style: italic;
@@ -112,14 +155,14 @@ ul:has(li a) {
             padding: 0.75em;
             background-color: var(--bg-color);
             border-radius: 4px;
-            box-shadow: 0 0.05em 0.15em rgba(0, 0, 0, 0.1);
+            box-shadow: 0 0.05em 0.15em var(--shadow-color);
             border: 1px solid var(--mix-70);
             background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.05));
 
             &:hover {
                 background-color: var(--mix-95);
                 border: 1px solid var(--mix-60);
-                box-shadow: 0 0.05em 0.15em rgba(0, 0, 0, 0.2);
+                box-shadow: 0 0.08em 0.22em var(--shadow-color);
             }
         }
     }
@@ -189,13 +232,13 @@ button.pagelink {
 .committed-choice-turn .story-choice:hover {
     background-color: var(--bg-color);
     border-color: var(--mix-70);
-    box-shadow: 0 0.05em 0.15em rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0.05em 0.15em var(--shadow-color);
 }
 
 .story-choice.committed-choice.chosen {
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
-    background-color: rgba(0, 0, 0, 0.01);
+    background-color: var(--surface-1);
 }
 
 .choice-result {
@@ -297,7 +340,7 @@ button {
     background-color: var(--bg-color);
     color: var(--fg-color);
     border-radius: 4px;
-    box-shadow: 0 0.05em 0.15em rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0.05em 0.15em var(--shadow-color);
     border: 1px solid var(--mix-70);
     background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.05));
 
@@ -306,7 +349,7 @@ button {
     &:hover {
         background-color: var(--mix-95);
         border: 1px solid var(--mix-60);
-        box-shadow: 0 0.05em 0.15em rgba(0, 0, 0, 0.2);
+        box-shadow: 0 0.08em 0.22em var(--shadow-color);
     }
 
     white-space: nowrap;
@@ -455,10 +498,10 @@ body.dev {
                         font-weight: 600;
                     }
 
-                    .project-analysis-errors, .severity-error { color: #b42318; }
-                    .project-analysis-warnings, .severity-warning { color: #8a5a00; }
+                    .project-analysis-errors, .severity-error { color: var(--error-color); }
+                    .project-analysis-warnings, .severity-warning { color: var(--warning-color); }
                     .severity-success { font-weight: 600; }
-                    .severity-success .icon { color: #18794e; }
+                    .severity-success .icon { color: var(--success-color); }
 
                     .project-analysis-note {
                         display: block;
@@ -504,9 +547,9 @@ body.dev {
                 #limited-analysis-notice {
                     grid-row: 2;
                     padding: 0.45em 0.65em;
-                    border-bottom: 1px solid #9a6700;
-                    background: #fff4ce;
-                    color: #4d3600;
+                    border-bottom: 1px solid var(--notice-border);
+                    background: var(--notice-bg);
+                    color: var(--notice-fg);
                     font-size: 0.8em;
                     line-height: 1.35;
                 }
@@ -630,9 +673,9 @@ body.dev {
                     .problem-source-range.exact { left: calc((var(--marker-column) - 1) * 1ch); width: calc(var(--marker-width) * 1ch); }
                     .problem-source-range.estimated { left: calc((var(--marker-column) - 1) * 1ch); width: 7ch; mask-image: linear-gradient(to right, black, transparent); }
                     .problem-source-range.whole-line { left: 0; right: 0; opacity: 0.45; }
-                    .token-heading, .token-keyword { color: #8250df; font-weight: 600; }
-                    .token-link, .token-string { color: #0a7c42; }
-                    .token-code, .token-number { color: #9a3b00; }
+                    .token-heading, .token-keyword { color: light-dark(#8250df, #d2a8ff); font-weight: 600; }
+                    .token-link, .token-string { color: light-dark(#0a7c42, #7ee787); }
+                    .token-code, .token-number { color: light-dark(#9a3b00, #ffa657); }
                     .token-emphasis { font-style: italic; }
                     .token-comment { color: var(--mix-50); font-style: italic; }
 
@@ -689,32 +732,32 @@ body.dev {
                         &.active {
                             opacity: 1;
                             polygon {
-                                stroke: #000;
+                                stroke: var(--graph-active-color);
                             }
                         }
                         &.current, &.available, &.graph-selected { opacity: 1; }
                         &.current polygon, &.graph-selected polygon { stroke-width: 3px; }
                         &.unreachable polygon { stroke-dasharray: 5 3; }
-                        &.missing polygon, &.has-error polygon { stroke: #b42318; }
-                        &.has-warning polygon { stroke: #9a6700; }
+                        &.missing polygon, &.has-error polygon { stroke: var(--graph-error-color); }
+                        &.has-warning polygon { stroke: var(--graph-warning-color); }
                     }
                     .edge {
                         opacity: 0.3;
                         &.active {
                             opacity: 1;
                             path {
-                                stroke: #000;
+                                stroke: var(--graph-active-color);
                             }
                             polygon {
-                                stroke: #000;
-                                fill: #000;
+                                stroke: var(--graph-active-color);
+                                fill: var(--graph-active-color);
                             }
                         }
                         &.available, &.graph-selected { opacity: 1; }
                         &.available path { stroke-width: 2px; }
-                        &.broken path, &.has-error path { stroke: #b42318; }
-                        &.broken polygon, &.has-error polygon { stroke: #b42318; fill: #b42318; }
-                        &.has-warning path { stroke: #9a6700; }
+                        &.broken path, &.has-error path { stroke: var(--graph-error-color); }
+                        &.broken polygon, &.has-error polygon { stroke: var(--graph-error-color); fill: var(--graph-error-color); }
+                        &.has-warning path { stroke: var(--graph-warning-color); }
                     }
                 }
 
@@ -756,15 +799,15 @@ table {
     th, td {
         padding: 0.5em;
         text-align: left;
-        border-bottom: 1px solid rgba(0,0,0,0.1);
+        border-bottom: 1px solid var(--border-color);
     }
 
     th {
-        background-color: rgba(0,0,0,0.1);
+        background-color: var(--surface-3);
         font-weight: bold;
     }
     tr:nth-child(even) {
-        background-color: rgba(0,0,0,0.03);
+        background-color: var(--surface-2);
     }
 }
 
@@ -793,5 +836,57 @@ div.choice {
 
     .pagelink {
         text-align: center
+    }
+}
+
+
+/* Dark-mode finishing touches */
+body,
+#game_pane,
+#dev_fixed,
+#graph-panel,
+#development-inspector,
+[role="tabpanel"] {
+    scrollbar-color: var(--border-strong) var(--surface-2);
+}
+
+#game_pane {
+    background: var(--bg-color);
+    color: var(--fg-color);
+}
+
+.story-choice {
+    background-color: var(--surface-1);
+    border-color: var(--border-color);
+    color: var(--fg-color);
+}
+
+.story-choice:hover {
+    background-color: var(--surface-2);
+    border-color: var(--border-strong);
+}
+
+.project-analysis-note,
+.problem-path,
+.problem-source-line-number,
+.token-comment {
+    color: var(--muted-color);
+}
+
+#graph-container {
+    background: var(--bg-color);
+}
+
+@media (prefers-color-scheme: dark) {
+    #graph-container svg {
+        filter: saturate(0.88) brightness(0.92);
+    }
+
+    img {
+        filter: brightness(0.94);
+    }
+
+    .problem-source-range {
+        background: color-mix(in srgb, var(--error-color) 35%, transparent);
     }
 }

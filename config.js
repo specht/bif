@@ -1,1 +1,1 @@
-export const path = "pages-night-train";
+export const path = "pages";
