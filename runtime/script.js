@@ -31,6 +31,8 @@ const el = {
     stateContainer: document.getElementById('state-container'),
     divider: document.getElementById('divider'),
     gamePane: document.getElementById('game_pane'),
+    storyControls: document.querySelector('.story-controls'),
+    endingActions: document.querySelector('.story-ending-actions'),
     content: document.getElementById('content'),
     storyStatus: document.getElementById('story-status'),
     clickedButton: null,
@@ -60,7 +62,8 @@ const replayNavigationRequests = new Map();
 let navigationQueue = Promise.resolve();
 let replayingHistory = false;
 let currentPassageHasNavigation = false;
-let storyRestartButton = null;
+let restartControl = null;
+let contextProgress = false;
 let keyboardNavigationPending = false;
 let graphKeyboardNavigationPending = false;
 let passageSerial = 0;
@@ -215,7 +218,10 @@ function createContextProxy(generation = sessionGeneration, outputParent = print
         }
     },
     set(target, key, value) {
-        if (!sessionWasAbandoned(generation)) target[key] = value;
+        if (!sessionWasAbandoned(generation)) {
+            if (!restoringSession && !replayingHistory && target[key] !== value) contextProgress = true;
+            target[key] = value;
+        }
         return true;
     },
     });
@@ -268,6 +274,7 @@ function runInContext(code, metadata, generation = sessionGeneration, outputPare
 function trackStoryTask(promise, metadata, generation = sessionGeneration, outputPassage = null) {
     const task = Promise.resolve(promise);
     activeStoryTasks.add(task);
+    updateEndingAction();
     task.catch(error => {
         if (error?.name === 'AbortError' || sessionWasAbandoned(generation)) return;
         const kind = metadata.hasAwait ? 'async-script' : 'page-script-runtime';
@@ -301,7 +308,7 @@ function trackStoryTask(promise, metadata, generation = sessionGeneration, outpu
         activeStoryTasks.delete(task);
         if (!sessionWasAbandoned(generation)) {
             updateStateDisplay();
-            updateRestartControl();
+            updateEndingAction();
             scheduleSessionWrite();
             if (!restoringSession && !replayingHistory && currentPassage === outputPassage && settledPassages.has(outputPassage)) {
                 scrollToCurrentPassage();
@@ -761,7 +768,11 @@ async function processStaticChoice(control, generation = sessionGeneration, { re
         } else {
             const edgeId = control.dataset.graphEdgeId ?? null;
             await navigateToPage(choice.target, generation);
+            const destinationLinks = nextPageLinks;
+            const destinationHasNavigation = currentPassageHasNavigation;
             await rebuildActivePage(runtime, generation);
+            nextPageLinks = destinationLinks;
+            currentPassageHasNavigation = destinationHasNavigation;
             passage.querySelector(':scope > .live-choice-set')?.remove();
             routeEdgeIds.push(edgeId);
             if (record) sessionEvents.push({ type: 'choice', choiceId: choice.identity, pageId: choice.target });
@@ -783,7 +794,7 @@ async function processStaticChoice(control, generation = sessionGeneration, { re
         passage.classList.remove('choice-pending');
         choiceTransaction = null;
         for (const candidate of passage.querySelectorAll('.story-choice:not(.chosen):not(.dismissed)')) candidate.removeAttribute('aria-disabled');
-        updateRestartControl();
+        updateEndingAction();
     }
     if (revealAfterCommit && record && !replayingHistory && !restoringSession) {
         if (revealAfterCommit.kind === 'local') startLocalReveal(revealAfterCommit.passage, revealAfterCommit.choiceId, generation);
@@ -815,10 +826,6 @@ async function appendPage(page, generation = sessionGeneration) {
             const previousLinks = nextPageLinks;
             const previousPassage = currentPassage;
             const previousNavigation = currentPassageHasNavigation;
-            if (storyRestartButton) {
-                storyRestartButton.remove();
-                storyRestartButton = null;
-            }
             currentPassageHasNavigation = false;
             const separator = history.length > 1 ? document.createElement('hr') : null;
 
@@ -876,7 +883,7 @@ async function appendPage(page, generation = sessionGeneration) {
             currentPassage = appendedPassage;
 
             decoratePageChoices(appendedPassage, generation);
-            updateRestartControl();
+                updateEndingAction();
 
             markNodesInGraph();
         })
@@ -1012,7 +1019,7 @@ function navigateToPage(page, generation = sessionGeneration) {
             pendingNavigations.delete(pageId);
         }
         if (!sessionWasAbandoned(generation)) {
-            updateRestartControl();
+            updateEndingAction();
             scheduleSessionWrite();
         }
     };
@@ -1020,42 +1027,12 @@ function navigateToPage(page, generation = sessionGeneration) {
     return navigation;
 }
 
-function updateRestartControl() {
-    if (devMode) {
-        if (storyRestartButton) storyRestartButton.remove();
-        storyRestartButton = null;
-        return;
-    }
+function updateEndingAction() {
+    if (!el.endingActions) return;
     const shouldShow = !currentPassageHasNavigation
         && activeStoryTasks.size === 0
         && pendingNavigations.size === 0;
-    if (!shouldShow) {
-        if (storyRestartButton) {
-            storyRestartButton.remove();
-            storyRestartButton = null;
-        }
-        return;
-    }
-    if (storyRestartButton) {
-        const developmentActions = devMode ? document.querySelector('.development-toolbar-actions') : null;
-        if (developmentActions && storyRestartButton.parentElement !== developmentActions) developmentActions.append(storyRestartButton);
-        return;
-    }
-
-    storyRestartButton = document.createElement('button');
-    storyRestartButton.classList.add('pagelink', 'story-restart', 'icon-text');
-    const developmentActions = devMode ? document.querySelector('.development-toolbar-actions') : null;
-    (developmentActions || el.content).appendChild(storyRestartButton);
-    const restartLabel = document.createElement('span');
-    restartLabel.className = 'icon-label';
-    restartLabel.textContent = devMode ? 'Restart' : 'Spiel neu starten';
-    storyRestartButton.append(createIcon('refresh'), restartLabel);
-    storyRestartButton.style.textAlign = 'center';
-    storyRestartButton.addEventListener('click', function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-        window.location.href = `${window.location.pathname}${window.location.search}`;
-    });
+    el.endingActions.hidden = !shouldShow;
 }
 
 function goToPage(page, generation = sessionGeneration) {
@@ -1124,6 +1101,7 @@ async function turnToPage(page, generation = sessionGeneration) {
         if (!replayingHistory) requestSessionWrite('push');
         routeEdgeIds.push(edgeId);
         markNodesInGraph();
+        updateEndingAction();
         if (!replayingHistory && !restoringSession) startPageReveal(currentPassage, generation);
     }
 }
@@ -1145,12 +1123,11 @@ function resetRuntimeForRestore() {
     pendingNavigations.clear();
     navigationQueue = Promise.resolve();
     currentPassageHasNavigation = false;
-    if (storyRestartButton) storyRestartButton.remove();
-    storyRestartButton = null;
     el.clickedButton = null;
     el.content.innerHTML = '';
     currentPassage = null;
     keyboardNavigationPending = false;
+    contextProgress = false;
     resetStoryContext();
     updateStateDisplay();
 }
@@ -1203,7 +1180,7 @@ async function restoreSession(session) {
             restoringSession = false;
             updateStateDisplay();
             markNodesInGraph();
-            updateRestartControl();
+            updateEndingAction();
             announcePassage(currentPassage, 'Current passage');
             if ((focusWasInTranscript || graphKeyboardNavigationPending) && currentPassage) {
                 currentPassage.focus({ preventScroll: true });
@@ -1213,6 +1190,7 @@ async function restoreSession(session) {
         }
     }
     sessionEvents = events.map(event => ({ ...event }));
+    contextProgress = events.some(event => event.type !== 'page' || `${event.pageId}` !== '1');
 }
 
 let graphvizInstancePromise = null;
@@ -1387,18 +1365,64 @@ async function loadAuthoringModules() {
     document.head.appendChild(stylesheet);
 }
 
-function addViewSwitch(mode) {
-    if (!isAuthoringEnvironment()) return;
+function hasMeaningfulProgress() {
+    const committedLocalChoice = Array.from(el.content.querySelectorAll('.story-passage'))
+        .some(passage => (passage.pageRuntime?.committed.size ?? 0) > 0);
+    const recordedProgress = sessionEvents.some(event => event.type !== 'page' || `${event.pageId}` !== '1');
+    return contextProgress || recordedProgress || history.length > 2 || committedLocalChoice;
+}
+
+export async function restartStory() {
+    if (hasMeaningfulProgress()
+        && !window.confirm('Restart the story? Your current progress will be lost.')) return false;
+    el.body.classList.add('skip-animations');
+    try {
+        await restoreSession({ seed: `${randomSeed()}`, events: [{ type: 'page', pageId: '1' }] });
+        requestSessionWrite('replace');
+        await Promise.resolve();
+        getTranscriptScroller().scrollTo({ top: 0, behavior: 'auto' });
+        restartControl?.focus({ preventScroll: true });
+        return true;
+    } finally {
+        el.body.classList.remove('skip-animations');
+    }
+}
+
+function iconButton({ className, label, icon }) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.id = 'bif-view-switch';
-    button.className = 'bif-view-switch';
-    button.textContent = mode === 'dev' ? 'Open game view' : 'Open authoring view';
-    button.setAttribute('aria-label', button.textContent);
-    button.addEventListener('click', () => {
-        window.location.assign(switchBrowserMode(mode === 'dev' ? 'game' : 'dev'));
-    });
-    document.body.appendChild(button);
+    button.className = `story-icon-button ${className}`;
+    button.setAttribute('aria-label', label);
+    button.title = label;
+    button.append(createIcon(icon));
+    return button;
+}
+
+function createStoryControls(mode) {
+    el.storyControls.replaceChildren();
+    restartControl = iconButton({ className: 'story-restart-control', label: 'Restart story', icon: 'refresh' });
+    restartControl.addEventListener('click', () => void restartStory());
+    el.storyControls.append(restartControl);
+
+    if (isAuthoringEnvironment()) {
+        const label = mode === 'dev' ? 'Open game view' : 'Open authoring view';
+        const button = iconButton({
+            className: 'story-view-toggle', label,
+            icon: mode === 'dev' ? 'book-2' : 'hierarchy-2',
+        });
+        button.id = 'bif-view-switch';
+        button.addEventListener('click', () => {
+            window.location.assign(switchBrowserMode(mode === 'dev' ? 'game' : 'dev'));
+        });
+        el.storyControls.append(button);
+    }
+
+    const playAgain = document.createElement('button');
+    playAgain.type = 'button';
+    playAgain.className = 'story-play-again';
+    playAgain.textContent = 'Play again';
+    playAgain.addEventListener('click', () => void restartStory());
+    el.endingActions.replaceChildren(playAgain);
 }
 
 export async function init() {
@@ -1410,23 +1434,12 @@ export async function init() {
     if (devMode) {
         await loadAuthoringModules();
         el.body.classList.add('dev');
-        document.querySelector('#bu_reset_game').addEventListener('click', function () {
-            window.location = `${window.location.pathname}${window.location.search}`;
-        });
-        document.querySelector('nav').style.display = 'unset';
-        // document.querySelector('#bu_fit_zoom').addEventListener('click', function() {
-        //     resetViewBox();
-        // });
         developmentUiState = createDevelopmentUiState({ storyPath: path, mode: 'dev' });
         const analysisClient = createBrowserAnalysisClient();
         mountBrowserAnalysisSummary({
             graphContainer: el.graphContainer,
             client: analysisClient,
         });
-        const developmentRestart = document.querySelector('#bu_reset_game');
-        developmentRestart.querySelector('.icon-label').textContent = 'Restart';
-        document.querySelector('.development-toolbar-actions').append(developmentRestart);
-        updateRestartControl();
         createGraphToolbar();
         graphProblems = createProblemsView({
             graphContainer: el.graphContainer,
@@ -1451,7 +1464,7 @@ export async function init() {
         updateStateDisplay();
         initPaneSlider();
     }
-    addViewSwitch(devMode ? 'dev' : 'game');
+    createStoryControls(devMode ? 'dev' : 'game');
 
     Math.w6 = () => Math.floor(Math.rand() * 6) + 1;
     Math.chance = (x) => Math.random() * 100 < x;

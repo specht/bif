@@ -6,6 +6,12 @@
       <path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z" />
       <path d="M12 16h.01" />
   </symbol>
+  <symbol id="icon-book-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+      <path d="M19 4v16h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12z" />
+      <path d="M19 16h-12a2 2 0 0 0 -2 2" />
+      <path d="M9 8h6" />
+  </symbol>
   <symbol id="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
       <path d="M5 12l5 5l10 -10" />
@@ -26,6 +32,14 @@
       <path d="M3 12l2 0" />
       <path d="M12 19l0 2" />
       <path d="M19 12l2 0" />
+  </symbol>
+  <symbol id="icon-hierarchy-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+      <path d="M10 3h4v4h-4z" />
+      <path d="M3 17h4v4h-4z" />
+      <path d="M17 17h4v4h-4z" />
+      <path d="M7 17l5 -4l5 4" />
+      <path d="M12 7l0 6" />
   </symbol>
   <symbol id="icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path stroke="none" d="M0 0h24v24H0z" fill="none"/>

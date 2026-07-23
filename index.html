@@ -27,15 +27,16 @@
                     <div id="state-container"></div>
                 </div>
             </div>
-            <div id="game_pane">
-                <div id="content">
+            <section id="game_pane">
+                <div class="story-controls-layer">
+                    <div class="story-controls" aria-label="Story controls"></div>
                 </div>
+                <main id="content">
+                </main>
+                <div class="story-ending-actions" hidden></div>
                 <div id="story-status" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
-            </div>
+            </section>
         </div>
-        <nav style="display: none;">
-            <button id="bu_reset_game" class="story-restart icon-text"><svg class="icon" aria-hidden="true" focusable="false"><use href="runtime/assets/icons.svg#icon-refresh"></use></svg><span class="icon-label">Spiel neu starten</span></button>
-        </nav>
         <script type="module">
             function renderFatalApplicationFailure() {
                 const failure = document.createElement('main');

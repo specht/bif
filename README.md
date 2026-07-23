@@ -16,7 +16,7 @@ Then either enable the **BIF Authoring Tools** VS Code extension or keep the sha
 npm run dev
 ```
 
-Open `index.html` with Live Server. A URL with a development port opens the authoring view on first use. Use **Open game view** and **Open authoring view** to switch; BIF remembers the choice for this project path. An ordinary hosted domain always opens the game and never loads authoring controls.
+Open `index.html` with Live Server. A URL with a development port opens the authoring view on first use. Use the compact book/graph control above the story to switch views; BIF remembers the choice for this project path. The neighboring restart control is always available. An ordinary hosted domain always opens the game, shows only restart, and never loads authoring controls.
 
 ## Project structure
 

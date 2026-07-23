@@ -252,10 +252,12 @@ test('local results replay once after reload', async ({ page }) => {
 
 test('history rewind restores chronological local checkpoints', async ({ page }) => {
   await openFixture(page);
+  const initialUrl = page.url();
   await chooseStoryOption(page, 'button', 'Ask whether he travels often.');
-  await expect.poll(() => page.url()).toContain('#');
+  await expect.poll(() => page.url()).not.toBe(initialUrl);
   const firstUrl = page.url();
   await chooseStoryOption(page, 'button', 'Ask the follow-up.');
+  await expect(page.locator('.committed-choice-turn')).toHaveCount(2);
   await expect.poll(() => page.url()).not.toBe(firstUrl);
   await page.goBack();
   await expect(page.locator('.committed-choice-turn')).toHaveCount(1);

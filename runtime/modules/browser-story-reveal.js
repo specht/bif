@@ -138,6 +138,7 @@ export function createStoryRevealController({ eventTarget, reducedMotion = () =>
         const stopFollowing = () => { if (!programmaticScroll) autoFollow = false; };
         const skipPointer = event => {
             if (!run) return;
+            if (event.target?.closest?.('.story-controls, .story-ending-actions')) return;
             event.preventDefault();
             event.stopImmediatePropagation();
             finish();
@@ -145,7 +146,7 @@ export function createStoryRevealController({ eventTarget, reducedMotion = () =>
         };
         const skipKey = event => {
             if (!run || ![' ', 'Enter', 'Escape'].includes(event.key)) return;
-            if (event.target?.matches?.('input, textarea, select, [contenteditable="true"]')) return;
+            if (event.target?.matches?.('button, input, textarea, select, [contenteditable="true"]')) return;
             event.preventDefault();
             event.stopImmediatePropagation();
             finish();

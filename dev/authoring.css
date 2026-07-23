@@ -1,15 +1,5 @@
-.bif-view-switch {
-    position: fixed;
-    right: 0.75rem;
-    bottom: 0.75rem;
-    z-index: 100;
-    border: 1px solid currentColor;
-    border-radius: 999px;
-    padding: 0.4rem 0.75rem;
-    background: Canvas;
-    color: CanvasText;
-    font: inherit;
-    cursor: pointer;
+body.dev #game_pane .story-controls-layer {
+    top: 0.25rem;
 }
 
 #project-analysis-status.analysis-stale {
