@@ -21,6 +21,14 @@
   --notice-fg: #4d3600;
 
   --graph-active-color: #111;
+  --graph-route-color: #111;
+  --graph-edge-color: #62676d;
+  --graph-label-color: #202124;
+  --graph-cluster-fill-opacity: 0.26;
+  --graph-cluster-stroke-opacity: 0.78;
+  --graph-node-fill-opacity: 0.66;
+  --graph-node-stroke-opacity: 0.86;
+  --graph-muted-node-fill-opacity: 0.38;
   --graph-error-color: #b42318;
   --graph-warning-color: #9a6700;
 
@@ -51,6 +59,14 @@
         --notice-fg: #ffe7a3;
 
         --graph-active-color: #f2f2f2;
+        --graph-route-color: #f2f2f2;
+        --graph-edge-color: #9aa0a6;
+        --graph-label-color: #f1f3f4;
+        --graph-cluster-fill-opacity: 0.22;
+        --graph-cluster-stroke-opacity: 0.72;
+        --graph-node-fill-opacity: 0.48;
+        --graph-node-stroke-opacity: 0.82;
+        --graph-muted-node-fill-opacity: 0.30;
         --graph-error-color: #ff7b72;
         --graph-warning-color: #f2cc60;
     }
@@ -723,41 +739,112 @@ body.dev {
                         touch-action: none;
                     }
 
+                    .cluster,
+                    .node,
+                    .edge {
+                        opacity: 1;
+                    }
+
+                    .graph-cluster-shape {
+                        fill-opacity: var(--graph-cluster-fill-opacity) !important;
+                        stroke-opacity: var(--graph-cluster-stroke-opacity) !important;
+                    }
+
+                    .graph-node-shape {
+                        fill-opacity: var(--graph-node-fill-opacity) !important;
+                        stroke-opacity: var(--graph-node-stroke-opacity) !important;
+                    }
+
+                    .graph-cluster-label,
+                    .graph-node-label,
+                    .graph-edge-label {
+                        fill: var(--graph-label-color) !important;
+                    }
+
                     .node {
                         cursor: pointer;
-                        &:hover {
-                            opacity: 1;
+
+                        .graph-node-shape,
+                        .graph-node-label {
+                            transition: fill-opacity 140ms ease, stroke-opacity 140ms ease, opacity 140ms ease;
                         }
-                        opacity: 0.5;
-                        &.active {
-                            opacity: 1;
-                            polygon {
-                                stroke: var(--graph-active-color);
+
+                        &:not(.active):not(.current):not(.available):not(.graph-selected) {
+                            .graph-node-shape {
+                                fill-opacity: var(--graph-muted-node-fill-opacity) !important;
+                                stroke-opacity: 0.48 !important;
                             }
+                            .graph-node-label { opacity: 0.62; }
                         }
-                        &.current, &.available, &.graph-selected { opacity: 1; }
-                        &.current polygon, &.graph-selected polygon { stroke-width: 3px; }
-                        &.unreachable polygon { stroke-dasharray: 5 3; }
-                        &.missing polygon, &.has-error polygon { stroke: var(--graph-error-color); }
-                        &.has-warning polygon { stroke: var(--graph-warning-color); }
+
+                        &:hover,
+                        &.active,
+                        &.current,
+                        &.available,
+                        &.graph-selected {
+                            .graph-node-label { opacity: 1; }
+                        }
+
+                        &.active .graph-node-shape {
+                            stroke: var(--graph-active-color) !important;
+                            stroke-opacity: 1 !important;
+                        }
+
+                        &.current .graph-node-shape,
+                        &.graph-selected .graph-node-shape {
+                            stroke: var(--graph-active-color) !important;
+                            stroke-width: 3px;
+                            stroke-opacity: 1 !important;
+                        }
+
+                        &.unreachable .graph-node-shape { stroke-dasharray: 5 3; }
+                        &.missing .graph-node-shape,
+                        &.has-error .graph-node-shape { stroke: var(--graph-error-color) !important; }
+                        &.has-warning .graph-node-shape { stroke: var(--graph-warning-color) !important; }
                     }
+
                     .edge {
-                        opacity: 0.3;
-                        &.active {
-                            opacity: 1;
-                            path {
-                                stroke: var(--graph-active-color);
-                            }
-                            polygon {
-                                stroke: var(--graph-active-color);
-                                fill: var(--graph-active-color);
-                            }
+                        opacity: 0.28;
+
+                        .graph-edge-path {
+                            stroke: var(--graph-edge-color) !important;
                         }
-                        &.available, &.graph-selected { opacity: 1; }
-                        &.available path { stroke-width: 2px; }
-                        &.broken path, &.has-error path { stroke: var(--graph-error-color); }
-                        &.broken polygon, &.has-error polygon { stroke: var(--graph-error-color); fill: var(--graph-error-color); }
-                        &.has-warning path { stroke: var(--graph-warning-color); }
+
+                        .graph-edge-arrow {
+                            stroke: var(--graph-edge-color) !important;
+                            fill: var(--graph-edge-color) !important;
+                        }
+
+                        &.active,
+                        &.available,
+                        &.graph-selected { opacity: 1; }
+
+                        &.active .graph-edge-path {
+                            stroke: var(--graph-route-color) !important;
+                            stroke-width: 2.4px;
+                        }
+
+                        &.active .graph-edge-arrow {
+                            stroke: var(--graph-route-color) !important;
+                            fill: var(--graph-route-color) !important;
+                        }
+
+                        &.available .graph-edge-path { stroke-width: 2px; }
+
+                        &.broken .graph-edge-path,
+                        &.has-error .graph-edge-path {
+                            stroke: var(--graph-error-color) !important;
+                        }
+
+                        &.broken .graph-edge-arrow,
+                        &.has-error .graph-edge-arrow {
+                            stroke: var(--graph-error-color) !important;
+                            fill: var(--graph-error-color) !important;
+                        }
+
+                        &.has-warning .graph-edge-path {
+                            stroke: var(--graph-warning-color) !important;
+                        }
                     }
                 }
 
@@ -878,15 +965,15 @@ body,
 }
 
 @media (prefers-color-scheme: dark) {
-    #graph-container svg {
-        filter: saturate(0.88) brightness(0.92);
-    }
-
     img {
         filter: brightness(0.94);
     }
 
     .problem-source-range {
         background: color-mix(in srgb, var(--error-color) 35%, transparent);
+    }
+
+    #graph-container {
+        background: #111;
     }
 }
