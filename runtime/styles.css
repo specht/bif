@@ -403,19 +403,27 @@ button {
     gap: 0.3rem;
     margin-inline-end: 0.3rem;
     padding: 0.25rem;
-    border: 1px solid var(--border-color);
+    /* border: 1px solid var(--border-color); */
     border-radius: 0.55rem;
-    background: var(--surface-1);
-    box-shadow: 0 0.125rem 0.5rem var(--shadow-color);
+    /* background: var(--surface-1); */
+    /* box-shadow: 0 0.125rem 0.5rem var(--shadow-color); */
     pointer-events: auto;
     opacity: 1;
     transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
+.story-controls {
+    /* transform: translate(100px, 13px); */
+}
+
+body.dev .story-controls {
+    transform: none;
+}
+
 .story-controls:hover,
 .story-controls:focus-within {
-    border-color: var(--border-strong);
-    box-shadow: 0 0.18rem 0.65rem var(--shadow-color);
+    /* border-color: var(--border-strong); */
+    /* box-shadow: 0 0.18rem 0.65rem var(--shadow-color); */
 }
 
 .story-icon-button {
@@ -428,10 +436,11 @@ button {
     padding: 0;
     border: 1px solid transparent;
     border-radius: 0.4rem;
-    background: transparent;
+    background: var(--surface-1);
     color: var(--fg-color);
     font: inherit;
     cursor: pointer;
+    box-shadow: 1px 1px 6px rgba(0, 0, 0, 0.15);
 }
 
 .story-icon-button .icon {
