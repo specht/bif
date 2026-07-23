@@ -1,6 +1,4 @@
-import { normalizeBrowserAnalysisDiagnostics } from './browser-diagnostic-message.js';
-
-const SUPPORTED_SCHEMA_VERSION = 1;
+const SUPPORTED_SCHEMA_VERSION = 2;
 const SUMMARY_FIELDS = [
     'pages',
     'reachablePages',
@@ -15,65 +13,14 @@ const DIAGNOSTIC_SEVERITIES = new Set(['error', 'warning', 'information', 'info'
 export const FAST_RETRY_DELAYS_MS = [250, 250, 500, 500, 1000];
 export const MONITOR_INTERVAL_MS = 4000;
 const DEFAULT_REFRESH_DEBOUNCE_MS = 300;
+const ASSET_VERIFY_INTERVAL_MS = 60000;
 
 function isObject(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function stableSerialize(value) {
-    if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`;
-    if (isObject(value)) return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(',')}}`;
-    return JSON.stringify(value ?? null);
-}
-
-function isLegacyLocalDiagnostic(diagnostic) {
-    return diagnostic?.target === '.'
-        && ['missing-page', 'ambiguous-target'].includes(diagnostic.code);
-}
-
-export function normalizeLegacyLocalTopology(value) {
-    const removedNodeIds = new Set(value.nodes
-        .filter(node => node?.pageId === '.' && node?.kind === 'missing')
-        .map(node => node.nodeId));
-    const diagnostics = value.diagnostics.filter(diagnostic => !isLegacyLocalDiagnostic(diagnostic));
-    const removedDiagnostics = value.diagnostics.filter(isLegacyLocalDiagnostic);
-    const nodes = value.nodes
-        .filter(node => !removedNodeIds.has(node.nodeId))
-        .map(node => ({
-            ...node,
-            diagnostics: (node.diagnostics || []).filter(diagnostic => !isLegacyLocalDiagnostic(diagnostic)),
-        }));
-    const edges = value.edges.filter(edge => edge?.target !== '.' && !removedNodeIds.has(edge?.targetNodeId));
-    const groups = value.groups
-        .map(group => ({ ...group, nodeIds: group.nodeIds.filter(nodeId => !removedNodeIds.has(nodeId)) }))
-        .filter(group => group.nodeIds.length > 0);
-    const errorsRemoved = removedDiagnostics.filter(item => item.severity === 'error').length;
-    const warningsRemoved = removedDiagnostics.filter(item => item.severity === 'warning').length;
-    return {
-        ...value,
-        summary: {
-            ...value.summary,
-            missingTargets: Math.max(0, value.summary.missingTargets - removedNodeIds.size),
-            errors: Math.max(0, value.summary.errors - errorsRemoved),
-            warnings: Math.max(0, value.summary.warnings - warningsRemoved),
-        },
-        nodes, edges, groups, diagnostics,
-    };
-}
-
-// Older Live Server publications have no analysisHash. Fingerprint only the
-// browser-consumed model so a schema transition can converge without relying
-// on source identity or volatile publication metadata.
 export function analysisIdentity(model) {
-    if (typeof model?.analysisHash === 'string' && model.analysisHash.trim()) return model.analysisHash;
-    return stableSerialize({
-        project: model?.project,
-        summary: model?.summary,
-        nodes: model?.nodes,
-        edges: model?.edges,
-        groups: model?.groups,
-        diagnostics: model?.diagnostics,
-    });
+    return model.analysisHash;
 }
 
 export function validateBrowserAnalysis(value) {
@@ -89,8 +36,15 @@ export function validateBrowserAnalysis(value) {
     if (typeof value.contentHash !== 'string' || value.contentHash.trim().length === 0) {
         return { valid: false, reason: 'invalid content hash' };
     }
-    if (value.analysisHash !== undefined && (typeof value.analysisHash !== 'string' || value.analysisHash.trim().length === 0)) {
+    if (!/^[a-f0-9]{64}$/.test(value.analysisHash || '')) {
         return { valid: false, reason: 'invalid analysis hash' };
+    }
+    if (!Array.isArray(value.inputManifest) || value.inputManifest.length === 0) return { valid: false, reason: 'invalid input manifest' };
+    for (const entry of value.inputManifest) {
+        if (!isObject(entry) || typeof entry.path !== 'string' || !/^[a-f0-9]{64}$/.test(entry.sha256 || '')
+            || entry.path.startsWith('/') || entry.path.includes('\\') || entry.path.split('/').includes('..')) {
+            return { valid: false, reason: 'invalid input manifest entry' };
+        }
     }
     if (!isObject(value.project)
         || typeof value.project.title !== 'string'
@@ -112,7 +66,7 @@ export function validateBrowserAnalysis(value) {
             return { valid: false, reason: 'invalid diagnostic severity' };
         }
     }
-    return { valid: true, model: normalizeBrowserAnalysisDiagnostics(normalizeLegacyLocalTopology(value)) };
+    return { valid: true, model: value };
 }
 
 export function createBrowserAnalysisClient({
@@ -126,6 +80,8 @@ export function createBrowserAnalysisClient({
     windowObject = window,
     setTimeoutImplementation = window.setTimeout.bind(window),
     clearTimeoutImplementation = window.clearTimeout.bind(window),
+    cryptoObject = globalThis.crypto,
+    now = Date.now,
 } = {}) {
     let requestGeneration = 0;
     let requestToken = 0;
@@ -141,6 +97,7 @@ export function createBrowserAnalysisClient({
     let schedulingMode = 'syncing';
     let started = false;
     let disposed = false;
+    let lastAssetVerification = 0;
     let state = {
         status: 'idle',
         model: null,
@@ -180,6 +137,28 @@ export function createBrowserAnalysisClient({
     function publishFailure(status, message) {
         if (state.status === status && state.message === message) return;
         publish(failureState(status, message));
+    }
+
+    async function sha256(bytes) {
+        const digest = await cryptoObject.subtle.digest('SHA-256', bytes);
+        return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function verifyManifest(model, reason) {
+        const verifyAssets = ['initial', 'manual', 'focus', 'visibility'].includes(reason)
+            || now() - lastAssetVerification >= ASSET_VERIFY_INTERVAL_MS;
+        const entries = model.inputManifest.filter(entry => /\.(?:md|js)$/i.test(entry.path) || verifyAssets);
+        if (verifyAssets) lastAssetVerification = now();
+        for (const entry of entries) {
+            const requestUrl = new URL(entry.path, documentObject.baseURI || windowObject.location.href);
+            requestUrl.searchParams.set('bif_verify', `${++requestToken}`);
+            let response;
+            try { response = await fetchImplementation(requestUrl.href, { cache: 'no-store', signal: activeController.signal }); }
+            catch { return { current: false, reason: `input could not be read: ${entry.path}` }; }
+            if (!response.ok) return { current: false, reason: `input is missing: ${entry.path}` };
+            if (await sha256(await response.arrayBuffer()) !== entry.sha256) return { current: false, reason: `input changed: ${entry.path}` };
+        }
+        return { current: true };
     }
 
     async function performRefresh(reason) {
@@ -240,19 +219,22 @@ export function createBrowserAnalysisClient({
             return state;
         }
 
+        const manifest = await verifyManifest(validation.model, reason);
+        if (disposed || generation !== requestGeneration) return state;
+
         const identity = analysisIdentity(validation.model);
         const changed = identity !== state.lastHash;
-        if (!changed && state.status === 'ready') return state;
+        if (!changed && state.status === (manifest.current ? 'ready' : 'stale')) return state;
         if (schedulingMode === 'syncing') {
             if (syncObservedHash === null) syncObservedHash = identity;
             else if (identity !== syncObservedHash) schedulingMode = 'monitoring';
         }
         publish({
-            status: 'ready',
+            status: manifest.current ? 'ready' : 'stale',
             model: validation.model,
             lastValidModel: validation.model,
             lastHash: identity,
-            message: null,
+            message: manifest.current ? null : manifest.reason,
             changed,
         });
         return state;

@@ -1,25 +1,19 @@
-import markdownit from '/lib/markdown-it.js';
-import markdownitAttrs from '/lib/markdown-it-attrs.js';
-import { Graphviz } from '/lib/graphviz.min.js';
-import { createBrowserAnalysisClient } from '/lib/browser-analysis-client.js';
-import { mountBrowserAnalysisSummary } from '/lib/browser-analysis-summary.js';
-import { matchRuntimeChoices } from '/lib/browser-graph-structure.js';
-import { createRuntimeOverlay } from '/lib/browser-graph-overlay.js';
-import { createUnifiedGraphView } from '/lib/browser-graph-view.js';
-import { createProblemsView } from '/lib/browser-problems-view.js';
-import { resolveBrowserMode } from '/lib/browser-mode.js';
-import { createDevelopmentUiState } from '/lib/browser-development-state.js';
-import { createIcon } from '/lib/browser-icons.js';
-import { panViewBox, pinchViewBox, zoomViewBoxAt, interpolateViewBox } from '/lib/browser-graph-viewport.js';
-import '/lib/choice-result-model.js';
-import { localTurnScrollTarget } from '/lib/browser-story-scroll.js';
-import { createStoryRevealController, planLocalTurnReveal, planPageReveal } from '/lib/browser-story-reveal.js';
+import markdownit from './vendor/markdown-it.js';
+import markdownitAttrs from './vendor/markdown-it-attrs.js';
+import { resolveBrowserMode, isAuthoringEnvironment, switchBrowserMode } from './modules/browser-mode.js';
+import './modules/choice-result-model.js';
+import { localTurnScrollTarget } from './modules/browser-story-scroll.js';
+import { createStoryRevealController, planLocalTurnReveal, planPageReveal } from './modules/browser-story-reveal.js';
+import { createIcon } from './modules/browser-icons.js';
+
+let Graphviz, createBrowserAnalysisClient, mountBrowserAnalysisSummary, matchRuntimeChoices,
+    createRuntimeOverlay, createUnifiedGraphView, createProblemsView, createDevelopmentUiState,
+    panViewBox, pinchViewBox, zoomViewBoxAt, interpolateViewBox;
 
 const ts = Date.now();
-const config = await import(`/config.js?${ts}`);
+const config = await import(new URL(`../config.js?v=${ts}`, import.meta.url));
 const { path } = config;
-if ('title' in config) console.warn('config.js title is ignored; add title metadata or an H1 to the selected story\'s 1.md.');
-if ('startPage' in config) console.warn('config.js startPage is ignored; stories always begin at 1.md.');
+const storyBaseUrl = new URL(`${path.replace(/^\.\//, '').replace(/\/$/, '')}/`, document.baseURI);
 
 const md = markdownit({ html: true, typographer: true }).use(markdownitAttrs);
 
@@ -216,9 +210,6 @@ function createContextProxy(generation = sessionGeneration, outputParent = print
             return choices => presentChoice(choices, generation, outputParent);
         } else if (key === 'goToPage') {
             return page => goToPage(page, generation);
-        } else if (key === 'forceTurnToPage') {
-            // Legacy compatibility for existing stories. Prefer goToPage().
-            return page => goToPage(page, generation);
         } else {
             return globalThis[key];
         }
@@ -358,6 +349,18 @@ function replaceDoubleBrackets(node) {
     }
 }
 
+function isStoryPageTarget(value) {
+    return Boolean(value) && !value.startsWith('#') && !value.includes('/') && !value.includes('.')
+        && !/^[a-z][a-z\d+.-]*:/i.test(value);
+}
+
+export function resolveStoryResourceUrl(value, baseUrl = storyBaseUrl) {
+    const source = `${value ?? ''}`;
+    if (!source || source.startsWith('/') || source.startsWith('#') || source.startsWith('//')
+        || /^[a-z][a-z\d+.-]*:/i.test(source)) return source;
+    return new URL(source, baseUrl).href;
+}
+
 async function processDOM(inputRoot, outputRoot, pageMetadata, generation = sessionGeneration, { executeScripts = true } = {}) {
     let scriptIndex = 0;
     const compiledExpressions = new WeakMap();
@@ -456,7 +459,9 @@ async function processDOM(inputRoot, outputRoot, pageMetadata, generation = sess
         // Copy attributes (except 'expression' and 'condition')
         for (const attr of node.attributes) {
             if (attr.name !== 'expression' && attr.name !== 'condition') {
-                clone.setAttribute(attr.name, attr.value);
+                const resourceAttribute = attr.name === 'src' && ['IMG', 'AUDIO', 'VIDEO', 'SOURCE'].includes(node.tagName)
+                    || attr.name === 'href' && node.tagName === 'A' && !isStoryPageTarget(attr.value);
+                clone.setAttribute(attr.name, resourceAttribute ? resolveStoryResourceUrl(attr.value) : attr.value);
             }
         }
 
@@ -475,29 +480,20 @@ async function processDOM(inputRoot, outputRoot, pageMetadata, generation = sess
 }
 
 function encodeSession() {
-    if (!sessionEvents.some(event => event.type === 'local')) {
-        const legacyPages = sessionEvents.map(event => event.pageId ?? event.value).filter(Boolean);
-        return lz.compress([history[0], ...legacyPages].join(','));
-    }
-    return lz.compress(JSON.stringify({ version: 2, seed: history[0], events: sessionEvents }));
+    return lz.compress(JSON.stringify({ version: 1, seed: history[0], events: sessionEvents }));
 }
 
 function decodeSession(hash = window.location.hash) {
     if (!hash) return null;
     const decompressed = lz.decompress(hash.replace(/^#/, ''));
     if (!decompressed) return null;
-    if (decompressed.startsWith('{')) {
-        try {
-            const session = JSON.parse(decompressed);
-            const seed = Number.parseInt(session.seed, 10);
-            if (session.version !== 2 || !Number.isFinite(seed) || !Array.isArray(session.events)) return null;
-            return { seed: `${seed}`, events: session.events };
-        } catch { return null; }
-    }
-    const legacy = decompressed.split(',');
-    const seed = Number.parseInt(legacy[0], 10);
-    if (!Number.isFinite(seed) || (legacy.length > 1 && legacy[1] !== '1')) return null;
-    return { seed: `${seed}`, events: legacy.slice(1).map(pageId => ({ type: 'page', pageId })) };
+    try {
+        const session = JSON.parse(decompressed);
+        const seed = Number.parseInt(session.seed, 10);
+        if (session.version !== 1 || !Number.isFinite(seed) || !Array.isArray(session.events)) return null;
+        if (!session.events.every(event => event && typeof event === 'object' && typeof event.type === 'string')) return null;
+        return { seed: `${seed}`, events: session.events };
+    } catch { return null; }
 }
 
 function requestSessionWrite(mode = 'push') {
@@ -798,7 +794,9 @@ async function processStaticChoice(control, generation = sessionGeneration, { re
 async function appendPage(page, generation = sessionGeneration) {
     const pagePath = `${path}/${page}.md`;
     let appendedPassage = null;
-    await fetch(`/${pagePath}?${cache_buster}`)
+    const pageUrl = new URL(`${encodeURIComponent(page)}.md`, storyBaseUrl);
+    pageUrl.searchParams.set('v', cache_buster);
+    await fetch(pageUrl)
         .then(response => {
             if (!response.ok) {
                 throw storyError('page-load', {
@@ -911,7 +909,9 @@ function randomSeed() {
 }
 
 async function loadPage(page) {
-    const response = await fetch(`/${path}/${page}.md?${cache_buster}`);
+    const pageUrl = new URL(`${encodeURIComponent(page)}.md`, storyBaseUrl);
+    pageUrl.searchParams.set('v', cache_buster);
+    const response = await fetch(pageUrl);
     if (!response.ok) {
         throw new Error('Network response was not ok');
     }
@@ -927,73 +927,6 @@ function resolvePageMetadata(page, source) {
         console.warn(warning);
     }
     return metadata.bodyMarkdown;
-}
-
-function parsePage(text) {
-    let group = null;
-    let summary = null;
-
-    let match = text.match(/<!--\s*(.*?)\s*--\s*(.*?)\s*-->/);
-    if (match) {
-        group = match[1].trim();
-        summary = match[2].trim();
-    } else {
-        match = text.match(/<!--\s*(.*?)\s*-->/);
-        if (match) {
-            group = match[1].trim();
-        }
-    }
-    let html = md.render(text);
-    let dom = new DOMParser().parseFromString(html, 'text/html');
-    let links = {};
-    let linkLabels = {};
-    for (let link of dom.querySelectorAll('a')) {
-        let href = link.getAttribute('href');
-        if (href.indexOf('/') < 0) {
-            links[href] = link;
-            if (link.hasAttribute('label')) {
-                let label = link.getAttribute('label');
-                linkLabels[href] = label.trim();
-                if (linkLabels[href].length === 0)
-                    linkLabels[href] = link.innerHTML.trim();
-            }
-        }
-    }
-    return {
-        group: group,
-        summary: summary,
-        links: Object.keys(links),
-        linkLabels: linkLabels,
-    }
-}
-
-function getColorForGroup(groupLabel) {
-    // Simple hash of string to integer
-    let hash = 0;
-    for (let i = 0; i < groupLabel.length; i++) {
-        hash = groupLabel.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const hue = Math.abs(hash) % 360;
-    const saturation = 50;
-
-    return [50, 70, 90].map(function (lightness) {
-        // Convert HSL to RGB
-        function hslToRgb(h, s, l) {
-            s /= 100;
-            l /= 100;
-            const k = n => (n + h / 30) % 12;
-            const a = s * Math.min(l, 1 - l);
-            const f = n => {
-                const v = l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
-                return Math.round(255 * v);
-            };
-            return [f(0), f(8), f(4)];
-        }
-
-        const [r, g, b] = hslToRgb(hue, saturation, lightness);
-        const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-        return hex;
-    });
 }
 
 function markNodesInGraph() {
@@ -1046,24 +979,6 @@ function availableGraphEdgeIds() {
     return [...(currentPassage?.querySelectorAll('.story-choice:not(.chosen):not(.dismissed)') ?? [])]
         .map(control => control.dataset.graphEdgeId)
         .filter(Boolean);
-}
-
-function wordWrap(text, maxLength) {
-    const words = text.split(' ');
-    let line = '';
-    let wrappedText = '';
-
-    words.forEach(word => {
-        if (line.length + word.length + 1 <= maxLength) {
-            line += (line.length ? ' ' : '') + word;
-        } else {
-            wrappedText += line + '\n';
-            line = word;
-        }
-    });
-    wrappedText += line;
-
-    return wrappedText;
 }
 
 function navigateToPage(page, generation = sessionGeneration) {
@@ -1300,112 +1215,6 @@ async function restoreSession(session) {
     sessionEvents = events.map(event => ({ ...event }));
 }
 
-async function loadGraph() {
-    let seenLinks = {};
-    let wavefront = {};
-    wavefront['1'] = true;
-    let dotLinks = [];
-    let subGraphs = {};
-    let pageSummaries = {};
-    let edgeSet = {};
-
-    while (Object.keys(wavefront).length > 0) {
-        let newWavefront = {};
-        for (let pageCode of Object.keys(wavefront)) {
-            seenLinks[pageCode] = true;
-            let page = null;
-            let pageData = null;
-            try {
-                page = await loadPage(pageCode);
-                pageData = parsePage(page);
-            } catch (e) {
-                pageData = { links: [], missing: true };
-            }
-            pageData.group ??= '';
-            subGraphs[pageData.group] ??= [];
-            subGraphs[pageData.group].push(pageCode);
-            pageData.summary ??= '';
-            pageData.summary = `${pageCode} ${pageData.summary}`.trim();
-            pageSummaries[pageCode] = pageData.summary;
-            for (let link of pageData.links) {
-                let edgeKey = `${pageCode}->${link}`;
-                if (!edgeSet[edgeKey]) {
-                    edgeSet[edgeKey] = true;
-                    if (pageData.linkLabels[link]) {
-                        dotLinks.push(`"${pageCode}" -> "${link}" [id="edge_${pageCode}_${link}", label="  ${wordWrap(pageData.linkLabels[link], 10)}"];`);
-                    } else {
-                        dotLinks.push(`"${pageCode}" -> "${link}" [id="edge_${pageCode}_${link}"];`);
-                    }
-                    if (seenLinks[link]) continue;
-                    newWavefront[link] = true;
-                }
-            }
-        }
-        wavefront = newWavefront;
-    }
-    let dot = "";
-    dot += `digraph Adventure {
-    rankdir="TB"
-    graph [fontname="Arial", fontsize=11, bgcolor="none"]
-    node [shape=box, style=filled, fontname="Arial", fontsize=11, color="#000000"]
-    edge [fontname="Arial", fontsize=11, penwidth=1, style="solid", color="#000000"]`;
-    for (let group of Object.keys(subGraphs)) {
-        if (group.length > 0) {
-            const groupColor = getColorForGroup(group);
-            dot += `subgraph cluster_${group.replace(/[^a-zA-Z0-9]/g, '_')} {
-            label="${group}"
-            labelloc="t"
-            labeljust="l"
-            style="rounded"
-            color="${groupColor[0]}"
-            penwidth=1.4
-            node [style="filled,rounded", fillcolor="${groupColor[1]}", color="${groupColor[0]}"]
-            ${subGraphs[group].map(page => `"${page}" [label="${wordWrap(pageSummaries[page] ?? '', 10).trim()}", id="node_${page}"]`).join('\n')}
-        }`;
-        } else {
-            dot += `
-            ${subGraphs[group].map(page => `"${page}" [label="${wordWrap(pageSummaries[page] ?? '', 10).trim()}", id="node_${page}", style=filled, fillcolor="#cccccc", color="#888888"]`).join('\n')}
-            `;
-        }
-    }
-    dot += dotLinks.join('\n');
-    dot += `}`;
-    Graphviz.load().then(graphviz => {
-        const svgText = graphviz.dot(dot);
-        el.graphContainer.innerHTML = svgText;
-        const svg = el.graphContainer.querySelector('svg');
-        svg.removeAttribute('width');
-        svg.removeAttribute('height');
-        for (let e of svg.querySelectorAll('title')) e.remove();
-        prepareGraphSvgForTheme(svg);
-        markNodesInGraph();
-        installPanAndZoomHandler(document.querySelector('#graph-container svg'));
-        for (let e of document.querySelectorAll('svg g.node')) {
-            e.addEventListener('click', async function (event) {
-                let id = this.getAttribute('id');
-                let page = id.substring(5);
-                if (nextPageLinks[page]) {
-                    // the node is one of the next pages, turn to that page
-                    // find button that belongs to the node
-                    el.clickedButton = nextPageLinks[page];
-                    await turnToPage(page);
-                } else {
-                    // the node is in the history, turn to that page
-                    let index = history.lastIndexOf(page);
-                    if (index > 0 && index < history.length - 1) {
-                        el.body.classList.add('skip-animations');
-                        let new_history = history.slice(0, index + 1);
-                        await restoreSession(new_history);
-                        requestSessionWrite('push');
-                        el.body.classList.remove('skip-animations');
-                    }
-                }
-            });
-        }
-
-    });
-}
-
 let graphvizInstancePromise = null;
 
 
@@ -1551,6 +1360,47 @@ function sortKeys(obj) {
     return obj;
 }
 
+async function loadAuthoringModules() {
+    const [graphviz, client, summary, structure, overlay, view, problems, uiState, viewport] = await Promise.all([
+        import('../dev/graphviz.min.js'),
+        import('../dev/browser-analysis-client.js'),
+        import('../dev/browser-analysis-summary.js'),
+        import('../dev/browser-graph-structure.js'),
+        import('../dev/browser-graph-overlay.js'),
+        import('../dev/browser-graph-view.js'),
+        import('../dev/browser-problems-view.js'),
+        import('../dev/browser-development-state.js'),
+        import('../dev/browser-graph-viewport.js'),
+    ]);
+    Graphviz = graphviz.Graphviz;
+    createBrowserAnalysisClient = client.createBrowserAnalysisClient;
+    mountBrowserAnalysisSummary = summary.mountBrowserAnalysisSummary;
+    matchRuntimeChoices = structure.matchRuntimeChoices;
+    createRuntimeOverlay = overlay.createRuntimeOverlay;
+    createUnifiedGraphView = view.createUnifiedGraphView;
+    createProblemsView = problems.createProblemsView;
+    createDevelopmentUiState = uiState.createDevelopmentUiState;
+    ({ panViewBox, pinchViewBox, zoomViewBoxAt, interpolateViewBox } = viewport);
+    const stylesheet = document.createElement('link');
+    stylesheet.rel = 'stylesheet';
+    stylesheet.href = new URL('../dev/authoring.css', import.meta.url).href;
+    document.head.appendChild(stylesheet);
+}
+
+function addViewSwitch(mode) {
+    if (!isAuthoringEnvironment()) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.id = 'bif-view-switch';
+    button.className = 'bif-view-switch';
+    button.textContent = mode === 'dev' ? 'Open game view' : 'Open authoring view';
+    button.setAttribute('aria-label', button.textContent);
+    button.addEventListener('click', () => {
+        window.location.assign(switchBrowserMode(mode === 'dev' ? 'game' : 'dev'));
+    });
+    document.body.appendChild(button);
+}
+
 export async function init() {
     setTimeout(() => {
         let width = el.devPane.clientWidth;
@@ -1558,6 +1408,7 @@ export async function init() {
     }, 1);
     el.body.classList.add('skip-animations');
     if (devMode) {
+        await loadAuthoringModules();
         el.body.classList.add('dev');
         document.querySelector('#bu_reset_game').addEventListener('click', function () {
             window.location = `${window.location.pathname}${window.location.search}`;
@@ -1596,12 +1447,11 @@ export async function init() {
             onNavigateEdge: navigateFromGraphEdge,
             onRewindPage: rewindFromGraph,
             onInspect: structuralId => graphProblems.selectProblem(structuralId),
-            loadFallback: loadGraph,
-            onLimitedState: show => graphProblems.showLimited(show),
         });
         updateStateDisplay();
         initPaneSlider();
     }
+    addViewSwitch(devMode ? 'dev' : 'game');
 
     Math.w6 = () => Math.floor(Math.rand() * 6) + 1;
     Math.chance = (x) => Math.random() * 100 < x;

@@ -1,8 +1,0 @@
-{
-  "schemaVersion": 1,
-  "contentHash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-  "project": { "title": "</script><img src=x onerror=globalThis.analysisInjected=true>", "pagesPath": "pages", "startPage": "1" },
-  "summary": { "pages": 1, "reachablePages": 1, "unreachablePages": 0, "choices": 0, "groups": 0, "missingTargets": 0, "errors": 0, "warnings": 0 },
-  "nodes": [{ "graphLabel": "</script><img src=x onerror=globalThis.analysisInjected=true>" }],
-  "edges": [], "groups": [], "diagnostics": []
-}

@@ -10,7 +10,7 @@ async function openChoiceFixture(page, mode = 'game') {
 test('semantic planner keeps structural blocks whole and splits only plain long prose', async ({ page }) => {
   await page.goto('/?mode=game');
   const result = await page.evaluate(async () => {
-    const reveal = await import('/lib/browser-story-reveal.js');
+    const reveal = await import('/runtime/modules/browser-story-reveal.js');
     const root = document.createElement('section');
     root.innerHTML = `<h2>Heading</h2>
       <p>Short sentence. Second sentence.</p>

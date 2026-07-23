@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const { parsePage } = require('../../tools/lib/page-parser');
 const { analyzeStory } = require('../../tools/lib/story-analyzer');
 const { buildBrowserAnalysisPublication } = require('../../tools/lib/browser-analysis-publication');
-const { classifyChoiceTarget } = require('../../lib/choice-result-model');
+const { classifyChoiceTarget } = require('../../runtime/modules/choice-result-model');
 
 test('only the exact dot target classifies as local', () => {
   assert.deepEqual(classifyChoiceTarget('.'), { kind: 'local', target: null, rawTarget: '.' });

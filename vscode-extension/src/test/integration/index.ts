@@ -19,7 +19,7 @@ export async function run(): Promise<void> {
   const api: any = await extension.activate();
   await waitFor(() => api.manager.projects.length === 1 && api.manager.projects[0].result);
   const commands = await vscode.commands.getCommands(true);
-  for (const command of ["bif.refreshDiagnostics", "bif.openStoryGraph", "bif.showStorySummary", "bif.showOutput"]) assert.ok(commands.includes(command));
+  for (const command of ["bif.refreshDiagnostics", "bif.showStorySummary", "bif.showOutput"]) assert.ok(commands.includes(command));
   const project = api.manager.projects[0];
   const allDiagnostics = () => vscode.languages.getDiagnostics().flatMap(([, values]) => values);
   await waitFor(() => allDiagnostics().length >= 4);
@@ -30,14 +30,14 @@ export async function run(): Promise<void> {
   const analysisPath = path.join(root, ".story-tools", "analysis.json");
   await waitFor(() => exists(analysisPath));
   const initialPublication = JSON.parse(await fs.readFile(analysisPath, "utf8"));
-  assert.equal(initialPublication.schemaVersion, 1);
+  assert.equal(initialPublication.schemaVersion, 2);
+  assert.ok(initialPublication.inputManifest.some((entry: any) => entry.path === "config.js"));
   assert.equal(initialPublication.summary.pages, project.result.summary.pages);
   assert.equal(initialPublication.summary.errors, project.result.summary.errors);
   assert.equal(initialPublication.summary.warnings, project.result.summary.warnings);
   assert.ok(!JSON.stringify(initialPublication).includes(root));
   assert.ok(!JSON.stringify(initialPublication).includes("vscode://"));
   assert.ok(!JSON.stringify(initialPublication).includes("story-code-executed"));
-  assert.ok(!(await exists(path.join(root, ".story-tools", "graph.html"))), "analysis must not generate a graph");
   const extensionBytes = await fs.readFile(analysisPath);
   const directPublication = await publishProjectAnalysis(root);
   const directBytes = await fs.readFile(analysisPath);
@@ -59,11 +59,6 @@ export async function run(): Promise<void> {
   assert.equal(deletedPublication.summary.missingTargets, 1);
   assert.ok(deletedPublication.nodes.some((node: any) => node.kind === "missing" && node.pageId === "99"));
   await vscode.commands.executeCommand("bif.refreshDiagnostics");
-  const graphPath = await api.generateGraph(project, false);
-  assert.ok(await exists(graphPath));
-  const html = await fs.readFile(graphPath, "utf8");
-  assert.match(html, /<svg/); assert.match(html, /expression-syntax/);
-  assert.ok(!html.includes("story-code-executed"));
 }
 
 async function exists(file: string): Promise<boolean> { try { await fs.access(file); return true; } catch { return false; } }

@@ -21,6 +21,17 @@ async function startProjectAnalysisWatch(projectRoot, options = {}) {
   let running = null;
   let rerun = false;
   let closed = false;
+  let watcher = null;
+  let watchedPagesPath = null;
+
+  async function updateWatchedStory(result) {
+    if (!watcher) return;
+    const next = result?.analysis?.project?.pagesPath;
+    if (!next || next === watchedPagesPath) return;
+    if (watchedPagesPath) await watcher.unwatch(path.join(projectRoot, watchedPagesPath));
+    await watcher.add(path.join(projectRoot, next));
+    watchedPagesPath = next;
+  }
 
   async function run() {
     if (closed) return;
@@ -28,7 +39,11 @@ async function startProjectAnalysisWatch(projectRoot, options = {}) {
     running = (async () => {
       do {
         rerun = false;
-        try { onResult(await publish(projectRoot)); }
+        try {
+          const result = await publish(projectRoot);
+          await updateWatchedStory(result);
+          onResult(result);
+        }
         catch (error) { onError(error); }
       } while (rerun && !closed);
     })();
@@ -44,7 +59,8 @@ async function startProjectAnalysisWatch(projectRoot, options = {}) {
 
   const initial = await publish(projectRoot);
   onResult(initial);
-  const watcher = chokidar.watch(projectRoot, {
+  watchedPagesPath = initial.analysis?.project?.pagesPath || "pages";
+  watcher = chokidar.watch([path.join(projectRoot, "config.js"), path.join(projectRoot, watchedPagesPath)], {
     ignoreInitial: true,
     ignored: candidate => ignoredPath(projectRoot, candidate),
     awaitWriteFinish: { stabilityThreshold: 75, pollInterval: 20 },

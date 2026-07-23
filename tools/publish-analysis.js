@@ -3,7 +3,7 @@ const path = require("node:path");
 const { publishProjectAnalysis } = require("./lib/publish-project-analysis");
 const { startProjectAnalysisWatch } = require("./lib/watch-project-analysis");
 
-const USAGE = "Usage: node tools/publish-analysis.js [--project PATH] [--watch]";
+const USAGE = "Usage: npm run dev -- [--project PATH]";
 
 function parseArguments(argv, cwd = process.cwd()) {
   const options = { project: path.resolve(cwd), help: false, watch: false };
@@ -31,7 +31,7 @@ async function main(argv = process.argv.slice(2)) {
     return 2;
   }
   if (options.help) {
-    console.log(`${USAGE}\n\nPublishes <project>/.story-tools/analysis.json. --watch keeps it current. Diagnostics do not make publication fail.`);
+    console.log(`${USAGE}\n\nPublishes .story-tools/analysis.json immediately and keeps it current. --watch is accepted for direct internal use.`);
     return 0;
   }
   try {

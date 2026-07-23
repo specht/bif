@@ -1,7 +1,7 @@
 {
   "name": "bif-authoring-tools",
   "displayName": "BIF Authoring Tools",
-  "description": "Diagnostics and a complete authoring graph for BIF Markdown interactive-fiction projects.",
+  "description": "Live diagnostics and browser analysis publication for BIF Markdown interactive-fiction projects.",
   "version": "0.1.0",
   "publisher": "gymnasiumsteglitz",
   "license": "MIT",
@@ -17,14 +17,12 @@
     "workspaceContains:config.js",
     "onLanguage:markdown",
     "onCommand:bif.refreshDiagnostics",
-    "onCommand:bif.openStoryGraph",
     "onCommand:bif.showStorySummary",
     "onCommand:bif.showOutput"
   ],
   "contributes": {
     "commands": [
       { "command": "bif.refreshDiagnostics", "title": "BIF: Refresh Story Diagnostics" },
-      { "command": "bif.openStoryGraph", "title": "BIF: Open Story Graph" },
       { "command": "bif.showStorySummary", "title": "BIF: Show Story Summary" },
       { "command": "bif.showOutput", "title": "BIF: Show Output" }
     ]

@@ -16,7 +16,7 @@ export const path = 'pages-night-train';
 
 ```bash
 npm run check-story
-npm run story-graph
+npm run check
 ```
 
 The story starts at `pages-night-train/1.md`.

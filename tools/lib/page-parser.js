@@ -1,6 +1,6 @@
 const MarkdownIt = require("markdown-it");
 const markdownItAttrs = require("markdown-it-attrs");
-const { classifyChoiceTarget, parseChoiceResults } = require("../../lib/choice-result-model");
+const { classifyChoiceTarget, parseChoiceResults } = require("../../runtime/modules/choice-result-model");
 
 const markdown = new MarkdownIt({ html: true }).use(markdownItAttrs);
 
@@ -33,6 +33,7 @@ function parseMetadata(source) {
 
 function collectSyntax(source, lineOffset = 0, extra = {}) {
   const images = [];
+  const resources = [];
   const conditions = [];
   const expressions = [];
   const scripts = [];
@@ -44,14 +45,25 @@ function collectSyntax(source, lineOffset = 0, extra = {}) {
       if (token.type === "image") {
         const src = token.attrGet("src") || "";
         const position = findPosition(source, src);
-        images.push({ src, alt: token.content || "", line: position.line + lineOffset, column: position.column, ...extra });
+        const item = { src, alt: token.content || "", tag: "img", line: position.line + lineOffset, column: position.column, ...extra };
+        images.push(item);
+        resources.push(item);
       }
     }
   }
   const rawImagePattern = /<img\b([^>]*)>/gi;
   for (const match of source.matchAll(rawImagePattern)) {
     const src = attribute(match[1], "src");
-    if (src) images.push({ src, alt: attribute(match[1], "alt") || "", line: lineAt(source, match.index) + lineOffset, column: 1, ...extra });
+    if (src) {
+      const item = { src, alt: attribute(match[1], "alt") || "", tag: "img", line: lineAt(source, match.index) + lineOffset, column: 1, ...extra };
+      images.push(item);
+      resources.push(item);
+    }
+  }
+  const mediaPattern = /<(audio|video|source)\b([^>]*)>/gi;
+  for (const match of source.matchAll(mediaPattern)) {
+    const src = attribute(match[2], "src");
+    if (src) resources.push({ src, alt: "", tag: match[1].toLowerCase(), line: lineAt(source, match.index) + lineOffset, column: 1, ...extra });
   }
   const scriptPattern = /<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi;
   let scriptIndex = 0;
@@ -75,7 +87,7 @@ function collectSyntax(source, lineOffset = 0, extra = {}) {
   for (const match of source.matchAll(inlineExpressionPattern)) {
     expressions.push({ source: match[1], line: lineAt(source, match.index) + lineOffset, column: 1, syntax: "inline", ...extra });
   }
-  return { images, scripts, unsupportedScripts, conditions, expressions };
+  return { images, resources, scripts, unsupportedScripts, conditions, expressions };
 }
 
 function parsePage(source, { pageId = "" } = {}) {
@@ -130,6 +142,7 @@ function parsePage(source, { pageId = "" } = {}) {
   return {
     metadata: parseMetadata(source), links, choices: links, resultBlocks,
     images: [...pageSyntax.images, ...resultBlocks.flatMap(block => block.images)],
+    resources: [...pageSyntax.resources, ...resultBlocks.flatMap(block => block.resources)],
     scripts: [...pageSyntax.scripts, ...resultBlocks.flatMap(block => block.scripts)],
     pageScripts: pageSyntax.scripts,
     resultScripts: resultBlocks.flatMap(block => block.scripts),

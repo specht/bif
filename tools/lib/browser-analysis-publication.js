@@ -22,7 +22,8 @@ function sanitizeDiagnostic(item) {
 function buildBrowserAnalysisPublication(analysis) {
   const model = buildAuthoringGraph(analysis);
   const content = {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    inputManifest: analysis.inputManifest.map(entry => ({ path: entry.path, sha256: entry.sha256 })),
     project: {
       title: model.project.title,
       pagesPath: model.project.pagesPath,
@@ -100,7 +101,13 @@ function buildBrowserAnalysisPublication(analysis) {
 }
 
 function validateBrowserAnalysisPublication(publication) {
-  if (publication.schemaVersion !== 1) throw new Error("Unsupported browser analysis schema");
+  if (publication.schemaVersion !== 2) throw new Error("Unsupported browser analysis schema");
+  if (!Array.isArray(publication.inputManifest) || publication.inputManifest.length === 0) throw new Error("Browser analysis inputManifest must not be empty");
+  for (const entry of publication.inputManifest) {
+    if (!entry || typeof entry.path !== "string" || !/^[a-f0-9]{64}$/.test(entry.sha256)) throw new Error("Invalid browser analysis manifest entry");
+    const normalized = entry.path.split("/");
+    if (path.isAbsolute(entry.path) || normalized.includes("..") || entry.path.includes("\\")) throw new Error(`Browser analysis manifest path must be project-relative: ${entry.path}`);
+  }
   for (const field of ["nodes", "edges", "groups", "diagnostics"]) {
     if (!Array.isArray(publication[field])) throw new Error(`Browser analysis ${field} must be an array`);
   }

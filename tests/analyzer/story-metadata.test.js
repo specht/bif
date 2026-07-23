@@ -3,7 +3,7 @@ const test = require('node:test');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { resolveStoryMetadata, FALLBACK_TITLE } = require('../../lib/story-metadata');
+const { resolveStoryMetadata, FALLBACK_TITLE } = require('../../runtime/modules/story-metadata');
 const { analyzeStory } = require('../../tools/lib/story-analyzer');
 
 test('story metadata resolves front matter, quoted values, H1 precedence, and stripped body', () => {
@@ -39,15 +39,14 @@ test('stripped front matter preserves source line positions for diagnostics', as
   assert.equal(result.diagnostics.find(item => item.code === 'script-syntax').line, 6);
 });
 
-test('mandatory config selects the directory while legacy title and start page are ignored', async () => {
+test('config path selects the directory and title comes from page 1', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'bif-title-'));
   await fs.mkdir(path.join(root, 'chosen'));
-  await fs.writeFile(path.join(root, 'config.js'), "export const path = 'chosen'; export const title = 'Legacy'; export const startPage = '7';\n");
+  await fs.writeFile(path.join(root, 'config.js'), "export const path = 'chosen';\n");
   await fs.writeFile(path.join(root, 'chosen', '1.md'), '# Derived title\n');
   const result = await analyzeStory(root);
   assert.equal(result.project.title, 'Derived title');
   assert.equal(result.project.startPage, '1');
   assert.equal(result.project.pagesPath, 'chosen');
-  assert.equal(result.diagnostics.filter(item => item.code === 'config-migration').length, 2);
   assert.equal(result.diagnostics.some(item => item.code === 'missing-story-title'), false);
 });

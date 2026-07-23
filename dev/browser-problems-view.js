@@ -1,6 +1,5 @@
 import { buildSourceSnippet, renderSourceSnippet, safeSourcePath } from './browser-source-snippet.js';
-import { createIcon } from './browser-icons.js';
-import { getPublicDiagnosticMessage } from './browser-diagnostic-message.js';
+import { createIcon } from '../runtime/modules/browser-icons.js';
 
 function diagnosticKey(item) {
     return [item.severity, item.code, item.file, item.line, item.column, item.message].join('|');
@@ -20,13 +19,13 @@ function compareDiagnostics(left, right) {
 }
 
 function displayMessage(diagnostic) {
-    const message = getPublicDiagnosticMessage(diagnostic);
+    const message = String(diagnostic.message || '');
     return Number.isInteger(diagnostic.line) ? `${message} (line ${diagnostic.line})` : message;
 }
 
 function accessibleDiagnosticText(diagnostic) {
     const location = [diagnostic.file, Number.isInteger(diagnostic.line) && `line ${diagnostic.line}`, Number.isInteger(diagnostic.column) && `column ${diagnostic.column}`].filter(Boolean).join(', ');
-    const message = getPublicDiagnosticMessage(diagnostic);
+    const message = String(diagnostic.message || '');
     return location ? `${location}: ${message}` : message;
 }
 
@@ -82,14 +81,6 @@ export function createProblemsView({ graphContainer, stateContainer, uiState = n
     statePanel.append(stateContainer);
     inspector.append(resizeHandle, header, problemsPanel, statePanel);
     graphPanel.append(inspector);
-
-    const limited = document.createElement('aside');
-    limited.id = 'limited-analysis-notice';
-    limited.hidden = true;
-    limited.setAttribute('role', 'status');
-    limited.tabIndex = 0;
-    limited.textContent = 'Analysis unavailable — showing a limited graph. Unreachable pages, missing targets, groups, and diagnostics may be incomplete. Enable the BIF extension or run: npm run analysis -- --watch';
-    graphPanel.insertBefore(limited, graphContainer);
 
     let problems = [];
     let selectedTab = ['problems', 'state'].includes(uiState?.get('selectedTab')) ? uiState.get('selectedTab') : 'state';
@@ -289,10 +280,5 @@ export function createProblemsView({ graphContainer, stateContainer, uiState = n
     return {
         render,
         selectProblem,
-        showLimited(show) {
-            limited.hidden = !show;
-            problemsTab.disabled = show;
-            if (show && selectedTab === 'problems') chooseTab('state', { expand: false });
-        },
     };
 }

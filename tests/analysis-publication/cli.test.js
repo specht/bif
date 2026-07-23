@@ -36,7 +36,7 @@ test("CLI publishes the current-directory project", () => {
   assert.match(result.stdout, /Published \.story-tools\/analysis\.json/);
   assert.match(result.stdout, /3 pages .* 3 choices .* 2 errors .* 2 warnings/);
   assert.match(result.stdout, /SHA-256: [a-f0-9]{64}/);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(root, ".story-tools", "analysis.json"), "utf8")).schemaVersion, 1);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root, ".story-tools", "analysis.json"), "utf8")).schemaVersion, 2);
 });
 
 test("CLI --project publishes from another working directory", () => {

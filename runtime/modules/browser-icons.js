@@ -8,7 +8,7 @@ export function createIcon(name) {
     svg.setAttribute('aria-hidden', 'true');
     svg.setAttribute('focusable', 'false');
     const use = document.createElementNS(SVG_NS, 'use');
-    use.setAttribute('href', `/assets/icons.svg#icon-${name}`);
+    use.setAttribute('href', new URL(`../assets/icons.svg#icon-${name}`, import.meta.url).href);
     svg.append(use);
     return svg;
 }

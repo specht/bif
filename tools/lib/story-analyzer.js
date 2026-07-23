@@ -4,7 +4,7 @@ const crypto = require("node:crypto");
 const { readProjectConfig } = require("./project-config");
 const { parsePage } = require("./page-parser");
 const { checkExpression, checkScript } = require("./javascript-checker");
-const { resolveStoryMetadata, FALLBACK_TITLE } = require("../../lib/story-metadata");
+const { resolveStoryMetadata, FALLBACK_TITLE } = require("../../runtime/modules/story-metadata");
 
 const collator = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
 const severityOrder = { error: 0, warning: 1, info: 2 };
@@ -25,22 +25,26 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
   const root = path.resolve(projectRoot);
   const diagnostics = [];
   const sourceEntries = [];
-  try { sourceEntries.push(["config.js", await fs.readFile(path.join(root, "config.js"), "utf8")]); } catch {}
+  const manifestEntries = new Map();
+  try {
+    const bytes = await fs.readFile(path.join(root, "config.js"));
+    sourceEntries.push(["config.js", bytes.toString("utf8")]);
+    manifestEntries.set("config.js", hashBytes(bytes));
+  } catch {}
   let config;
   try {
     config = await readProjectConfig(root);
   } catch (error) {
     diagnostics.push(diagnostic("error", "config-error", "config.js", error.loc?.line || 1, (error.loc?.column || 0) + 1, error.message));
-    return finish(root, { title: FALLBACK_TITLE, pagesPath: "", startPage: "1" }, [], [], diagnostics, 0, sourceEntries);
+    return finish(root, { title: FALLBACK_TITLE, pagesPath: "", startPage: "1" }, [], [], diagnostics, 0, sourceEntries, manifestEntries);
   }
 
   const pagesDirectory = path.resolve(root, config.pagesPath);
   const pagesPathLocation = config.pagesPathLocation || { line: 1, column: 1 };
-  for (const message of config.migrationWarnings || []) diagnostics.push(diagnostic("warning", "config-migration", "config.js", 1, 1, message));
   let storyTitle = FALLBACK_TITLE;
   if (!pagesDirectory.startsWith(`${root}${path.sep}`) && pagesDirectory !== root) {
     diagnostics.push(diagnostic("error", "pages-path-outside-project", "config.js", pagesPathLocation.line, pagesPathLocation.column, `Configured story path escapes the project: ${config.pagesPath}`, pagesPathLocation));
-    return finish(root, { ...config, title: FALLBACK_TITLE, startPage: "1" }, [], [], diagnostics, 0, sourceEntries);
+    return finish(root, { ...config, title: FALLBACK_TITLE, startPage: "1" }, [], [], diagnostics, 0, sourceEntries, manifestEntries);
   }
 
   let files;
@@ -56,7 +60,7 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
         ? `Configured story path is not a directory: ${config.pagesPath}`
         : `Cannot read configured story directory '${config.pagesPath}': ${error.message}`;
     diagnostics.push(diagnostic("error", "pages-path-missing", "config.js", pagesPathLocation.line, pagesPathLocation.column, message, pagesPathLocation));
-    return finish(root, { ...config, title: FALLBACK_TITLE, startPage: "1" }, [], [], diagnostics, 0, sourceEntries);
+    return finish(root, { ...config, title: FALLBACK_TITLE, startPage: "1" }, [], [], diagnostics, 0, sourceEntries, manifestEntries);
   }
 
   const pages = [];
@@ -79,6 +83,7 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
       continue;
     }
     sourceEntries.push([file, source]);
+    manifestEntries.set(file, hashBytes(Buffer.from(source)));
     if (id === "1") {
       const metadata = resolveStoryMetadata(source, { sourcePath: file });
       storyTitle = metadata.title;
@@ -103,6 +108,7 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
       conditions: parsed.conditions,
       expressions: parsed.expressions,
       images: parsed.images,
+      resources: parsed.resources,
     };
     pages.push(page);
 
@@ -137,19 +143,25 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
       const error = checkExpression(expression.source);
       if (error) diagnostics.push(diagnostic("error", "expression-syntax", file, expression.line + Math.max((error.line || 1) - 1, 0), (error.column || 0) + 1, `Invalid expression '${expression.source}': ${error.message}`, { expressionLine: error.line, expressionColumn: error.column, source: expression.source }));
     }
-    for (const image of parsed.images) {
-      if (/^(?:data:|https?:|\/\/)/i.test(image.src)) continue;
+    for (const resource of parsed.resources) {
+      if (/^(?:[a-z][a-z\d+.-]*:|\/\/|\/|#)/i.test(resource.src)) continue;
       let asset;
-      try { asset = path.resolve(root, cleanAssetPath(image.src)); } catch {
-        diagnostics.push(diagnostic("error", "invalid-image-path", file, image.line, image.column, `Invalid image path '${image.src}'.`));
+      try { asset = path.resolve(pagesDirectory, cleanAssetPath(resource.src)); } catch {
+        diagnostics.push(diagnostic("error", "invalid-asset-path", file, resource.line, resource.column, `Invalid asset path '${resource.src}'.`));
         continue;
       }
-      if (!asset.startsWith(`${root}${path.sep}`)) {
-        diagnostics.push(diagnostic("error", "path-outside-project", file, image.line, image.column, `Image path escapes the project: ${image.src}`));
+      if (asset !== pagesDirectory && !asset.startsWith(`${pagesDirectory}${path.sep}`)) {
+        diagnostics.push(diagnostic("error", "asset-outside-story", file, resource.line, resource.column, `Story asset path escapes the configured story directory: ${resource.src}`));
       } else {
-        try { await fs.access(asset); } catch { diagnostics.push(diagnostic("error", "missing-image", file, image.line, image.column, `Image not found: ${image.src}`)); }
+        try {
+          const bytes = await fs.readFile(asset);
+          manifestEntries.set(relative(root, asset), hashBytes(bytes));
+        } catch {
+          const code = resource.tag === "img" ? "missing-image" : "missing-asset";
+          diagnostics.push(diagnostic("error", code, file, resource.line, resource.column, `Story asset not found: ${resource.src}`));
+        }
       }
-      if (!image.alt.trim()) diagnostics.push(diagnostic("warning", "missing-image-alt", file, image.line, image.column, `Image has no alternative text: ${image.src}`));
+      if (resource.tag === "img" && !resource.alt.trim()) diagnostics.push(diagnostic("warning", "missing-image-alt", file, resource.line, resource.column, `Image has no alternative text: ${resource.src}`));
     }
   }
 
@@ -177,14 +189,18 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
     if (!reachable.has(page.id)) diagnostics.push(diagnostic("warning", "unreachable-page", page.file, 1, 1, `Page '${page.id}' is unreachable from page '${startPage}'.`));
   }
 
-  return finish(root, { ...config, title: storyTitle, startPage }, pages, edges, diagnostics, reachable.size, sourceEntries);
+  return finish(root, { ...config, title: storyTitle, startPage }, pages, edges, diagnostics, reachable.size, sourceEntries, manifestEntries);
+}
+
+function hashBytes(bytes) {
+  return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
 function relative(root, value) {
   return path.relative(root, value).split(path.sep).join("/") || ".";
 }
 
-function finish(root, project, pages, edges, diagnostics, reachablePages = 0, sourceEntries = []) {
+function finish(root, project, pages, edges, diagnostics, reachablePages = 0, sourceEntries = [], manifestEntries = new Map()) {
   pages.sort((a, b) => collator.compare(a.id, b.id) || a.file.localeCompare(b.file));
   edges.sort((a, b) => collator.compare(a.source, b.source) || collator.compare(a.target, b.target) || a.line - b.line || a.column - b.column);
   diagnostics.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.column - b.column || severityOrder[a.severity] - severityOrder[b.severity] || a.code.localeCompare(b.code));
@@ -193,6 +209,7 @@ function finish(root, project, pages, edges, diagnostics, reachablePages = 0, so
   return {
     version: 1,
     contentHash: crypto.createHash("sha256").update(JSON.stringify(sourceEntries)).digest("hex"),
+    inputManifest: [...manifestEntries].sort(([a], [b]) => a.localeCompare(b)).map(([file, sha256]) => ({ path: file, sha256 })),
     project: { root: ".", title: project.title, pagesPath: project.pagesPath, startPage: project.startPage },
     summary: {
       pages: pages.length,

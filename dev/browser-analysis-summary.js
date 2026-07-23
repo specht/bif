@@ -1,4 +1,4 @@
-import { createIcon } from './browser-icons.js';
+import { createIcon } from '../runtime/modules/browser-icons.js';
 
 function countLabel(count, singular, plural = `${singular}s`) {
     return `${count} ${count === 1 ? singular : plural}`;
@@ -43,7 +43,7 @@ export function mountBrowserAnalysisSummary({ graphContainer, client }) {
 
     const message = document.createElement('span');
     message.className = 'project-analysis-message';
-    message.textContent = 'Project analysis: loading…';
+    message.textContent = 'Authoring analysis: loading…';
 
     const counts = document.createElement('span');
     counts.id = 'project-analysis-counts';
@@ -82,7 +82,8 @@ export function mountBrowserAnalysisSummary({ graphContainer, client }) {
 
     let renderedHash = null;
     function render(state) {
-        retry.hidden = !['unavailable', 'invalid', 'error'].includes(state.status);
+        retry.hidden = !['unavailable', 'invalid', 'error', 'stale'].includes(state.status);
+        status.classList.toggle('analysis-stale', state.status === 'stale');
         if (state.model) {
             message.hidden = true;
             counts.hidden = false;
@@ -103,9 +104,13 @@ export function mountBrowserAnalysisSummary({ graphContainer, client }) {
                 replaceIconText(clean, 'check', 'No problems');
                 renderedHash = identity;
             }
-            note.textContent = ['unavailable', 'invalid', 'error'].includes(state.status)
-                ? `Project analysis may be out of date. ${state.message}.`
-                : '';
+            if (state.status === 'stale') {
+                note.textContent = 'Authoring analysis is out of date. The story has changed, but analysis is not being updated. Enable the BIF Authoring Tools extension or run npm run dev.';
+            } else if (['unavailable', 'invalid', 'error'].includes(state.status)) {
+                note.textContent = state.status === 'unavailable'
+                    ? 'Authoring analysis is unavailable. Install/enable the BIF Authoring Tools extension, or run npm run dev.'
+                    : `Authoring analysis is invalid (${state.message}). Install/enable the BIF Authoring Tools extension, or run npm run dev.`;
+            } else note.textContent = '';
             status.hidden = note.textContent.length === 0;
             return;
         }
@@ -115,11 +120,11 @@ export function mountBrowserAnalysisSummary({ graphContainer, client }) {
         note.textContent = '';
         message.hidden = false;
         if (state.status === 'loading' || state.status === 'idle') {
-            message.textContent = 'Project analysis: loading…';
+            message.textContent = 'Authoring analysis: loading…';
         } else if (state.status === 'unavailable') {
-            message.textContent = 'Project analysis unavailable. Run the BIF extension or refresh diagnostics.';
+            message.textContent = 'Authoring analysis is unavailable. Install/enable the BIF Authoring Tools extension, or run npm run dev.';
         } else if (state.status === 'invalid') {
-            message.textContent = `Project analysis could not be read: ${state.message}.`;
+            message.textContent = `Authoring analysis is invalid (${state.message}). Install/enable the BIF Authoring Tools extension, or run npm run dev.`;
         } else {
             message.textContent = `Project analysis could not be loaded: ${state.message}.`;
         }

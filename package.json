@@ -8,15 +8,13 @@
     "test:graph": "node --test tests/authoring-graph",
     "test:browser": "playwright test",
     "test:headed": "playwright test --headed",
-    "check-story": "node tools/check-story.js",
-    "analysis": "node tools/publish-analysis.js",
-    "story-graph": "node tools/story-graph.js",
+    "dev": "node tools/publish-analysis.js --watch",
+    "check": "node tools/check-story.js",
     "generate-icons": "node tools/generate-icon-sprite.js",
     "test:extension": "npm --prefix vscode-extension test",
     "test:all": "npm test && npm run test:extension"
   },
   "devDependencies": {
-    "@hpcc-js/wasm": "^2.34.8",
     "@playwright/test": "^1.54.1",
     "@tabler/icons": "3.34.1",
     "acorn": "^8.17.0",

@@ -1,6 +1,8 @@
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
 const path = require("node:path");
+const os = require("node:os");
+const fs = require("node:fs/promises");
 const { test } = require("node:test");
 const acorn = require("acorn");
 const { analyzeStory } = require("../../tools/lib/story-analyzer");
@@ -117,7 +119,7 @@ test("bork parser failure retains raw Acorn location but publishes only its sema
 test("local image existence, traversal, and missing alt text are checked", async () => {
   const result = await analyzeStory(fixture("missing-image"));
   assert.ok(result.diagnostics.some((item) => item.code === "missing-image" && item.message.includes("assets/missing.png")));
-  assert.ok(result.diagnostics.some((item) => item.code === "path-outside-project"));
+  assert.ok(result.diagnostics.some((item) => item.code === "asset-outside-story"));
   assert.ok(result.diagnostics.some((item) => item.code === "missing-image-alt"));
   assert.ok(!result.diagnostics.some((item) => item.message.includes("example.test")));
 });
@@ -157,4 +159,41 @@ test("analysis output is deterministic", async () => {
   const first = await analyzeStory(fixture("valid"));
   const second = await analyzeStory(fixture("valid"));
   assert.equal(JSON.stringify(first), JSON.stringify(second));
+});
+
+test("raw HTML media and story-local assets are included in the input manifest", async () => {
+  const project = await fs.mkdtemp(path.join(os.tmpdir(), "bif-media-"));
+  try {
+    await fs.mkdir(path.join(project, "story", "media"), { recursive: true });
+    await fs.writeFile(path.join(project, "config.js"), "export const path = 'story';\n");
+    await fs.writeFile(path.join(project, "story", "1.md"), "# Media\n\n<audio src=\"media/theme.ogg\"></audio>\n<video><source src=\"media/clip.mp4\"></video>\n");
+    await fs.writeFile(path.join(project, "story", "media", "theme.ogg"), "audio");
+    await fs.writeFile(path.join(project, "story", "media", "clip.mp4"), "video");
+    const result = await analyzeStory(project);
+    assert.equal(result.summary.errors, 0);
+    assert.deepEqual(result.inputManifest.map(item => item.path), [
+      "config.js", "story/1.md", "story/media/clip.mp4", "story/media/theme.ogg",
+    ]);
+  } finally {
+    await fs.rm(project, { recursive: true });
+  }
+});
+
+test("the same relative asset name resolves independently in two story folders", async () => {
+  const project = await fs.mkdtemp(path.join(os.tmpdir(), "bif-stories-"));
+  try {
+    for (const story of ["story-a", "story-b"]) {
+      await fs.mkdir(path.join(project, story, "images"), { recursive: true });
+      await fs.writeFile(path.join(project, story, "1.md"), `# ${story}\n\n![Map](images/map.png)\n`);
+      await fs.writeFile(path.join(project, story, "images", "map.png"), story);
+    }
+    await fs.writeFile(path.join(project, "config.js"), "export const path = 'story-a';\n");
+    const first = await analyzeStory(project);
+    await fs.writeFile(path.join(project, "config.js"), "export const path = 'story-b';\n");
+    const second = await analyzeStory(project);
+    assert.ok(first.inputManifest.some(item => item.path === "story-a/images/map.png"));
+    assert.ok(second.inputManifest.some(item => item.path === "story-b/images/map.png"));
+  } finally {
+    await fs.rm(project, { recursive: true });
+  }
 });

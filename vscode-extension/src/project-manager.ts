@@ -27,6 +27,7 @@ export interface ManagedProject {
   scheduler: GenerationScheduler;
   state: "idle" | "analysing" | "error";
   lastError?: Error;
+  watchedPagesPath?: string;
 }
 
 export class ProjectManager implements vscode.Disposable {
@@ -48,14 +49,11 @@ export class ProjectManager implements vscode.Disposable {
       const scheduler = new GenerationScheduler(async generation => this.analyse(project, generation), 300);
       project = { folder, root: folder.uri.fsPath, diagnosticUris: new Set(), watchers: [], scheduler, state: "idle" };
       this.projects.push(project);
-      const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, "**/*.{md,png,jpg,jpeg,gif,webp,svg}"));
       const configWatcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, "config.js"));
-      for (const event of [watcher.onDidCreate, watcher.onDidChange, watcher.onDidDelete, configWatcher.onDidCreate, configWatcher.onDidChange, configWatcher.onDidDelete]) {
-        project.watchers.push(event.call(watcher, (uri: vscode.Uri) => {
-          if (!isGeneratedFile(project.root, uri.fsPath)) scheduler.schedule();
-        }));
+      for (const event of [configWatcher.onDidCreate, configWatcher.onDidChange, configWatcher.onDidDelete]) {
+        project.watchers.push(event.call(configWatcher, () => scheduler.schedule()));
       }
-      project.watchers.push(watcher, configWatcher);
+      project.watchers.push(configWatcher);
       this.output.appendLine(`Discovered BIF project: ${folder.name}`);
       await scheduler.runNow();
     }
@@ -80,6 +78,7 @@ export class ProjectManager implements vscode.Disposable {
       for (const [, [uri, diagnostics]] of grouped) this.diagnostics.set(uri, diagnostics);
       project.diagnosticUris = nextUris;
       project.result = result; project.state = "idle"; project.lastError = undefined;
+      this.updateStoryWatcher(project, result.project.pagesPath);
       this.output.appendLine(`${result.project.title}: ${summaryText(result.summary)} · analysis ${published.contentHash.slice(0, 12)}`);
     } catch (error) {
       const code = typeof error === "object" && error && "code" in error ? String(error.code) : undefined;
@@ -88,6 +87,23 @@ export class ProjectManager implements vscode.Disposable {
       const label = code === "publication-failed" ? "Analysis publication failed" : "Analysis failed";
       this.output.appendLine(`${label} for ${project.folder.name}: ${project.lastError.stack || project.lastError.message}`);
     } finally { this.updateStatus(project); }
+  }
+
+  private updateStoryWatcher(project: ManagedProject, pagesPath: string): void {
+    if (project.watchedPagesPath === pagesPath) return;
+    const old = project.watchers.filter(item => (item as any).__bifStoryWatcher);
+    old.forEach(item => { item.dispose(); project.watchers.splice(project.watchers.indexOf(item), 1); });
+    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(project.folder, `${pagesPath}/**/*`));
+    (watcher as any).__bifStoryWatcher = true;
+    for (const event of [watcher.onDidCreate, watcher.onDidChange, watcher.onDidDelete]) {
+      const disposable = event.call(watcher, (uri: vscode.Uri) => {
+        if (!isGeneratedFile(project.root, uri.fsPath)) project.scheduler.schedule();
+      });
+      (disposable as any).__bifStoryWatcher = true;
+      project.watchers.push(disposable);
+    }
+    project.watchers.push(watcher);
+    project.watchedPagesPath = pagesPath;
   }
 
   async refresh(project?: ManagedProject): Promise<void> { await (project || await this.chooseProject())?.scheduler.runNow(); }

@@ -4,19 +4,19 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Interaktives Abenteuer</title>
-        <script src="/lib/js-yaml.min.js"></script>
-        <script src="/lib/lz-string.min.js"></script>
-        <script src="/lib/story-metadata.js"></script>
+        <script src="runtime/vendor/js-yaml.min.js"></script>
+        <script src="runtime/vendor/lz-string.min.js"></script>
+        <script src="runtime/modules/story-metadata.js"></script>
 
         <script>
             const ts = Date.now();
             const style = document.createElement('link');
             style.rel = 'stylesheet';
-            style.href = `/styles.css?v=${ts}`;
+            style.href = `runtime/styles.css?v=${ts}`;
             document.head.appendChild(style);
         </script>
 
-        <link rel="stylesheet" href="/fonts/fonts.css">
+        <link rel="stylesheet" href="runtime/fonts/fonts.css">
     </head>
     <body>
         <div id="resizable-children">
@@ -34,7 +34,7 @@
             </div>
         </div>
         <nav style="display: none;">
-            <button id="bu_reset_game" class="story-restart icon-text"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-refresh"></use></svg><span class="icon-label">Spiel neu starten</span></button>
+            <button id="bu_reset_game" class="story-restart icon-text"><svg class="icon" aria-hidden="true" focusable="false"><use href="runtime/assets/icons.svg#icon-refresh"></use></svg><span class="icon-label">Spiel neu starten</span></button>
         </nav>
         <script type="module">
             function renderFatalApplicationFailure() {
@@ -44,7 +44,7 @@
                 failure.textContent = 'The story application could not be started.';
                 document.body.replaceChildren(failure);
             }
-            import(`/lib/script.js?v=${ts}`)
+            import(`./runtime/script.js?v=${ts}`)
                 .then(mod => mod.init())
                 .catch(error => {
                     console.error('Could not initialize story application:', error);

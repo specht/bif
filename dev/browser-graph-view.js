@@ -11,16 +11,11 @@ export function createUnifiedGraphView({
     onNavigateEdge,
     onRewindPage,
     onInspect = () => {},
-    loadFallback,
-    onLimitedState,
-    limitedDelayMs = 5000,
 }) {
     let structure = null;
     let renderedHash = null;
     let renderGeneration = 0;
-    let fallbackStarted = false;
     let selectedId = null;
-    let limitedTimer = null;
 
     function setSelected(id) {
         container.querySelector('.graph-selected')?.classList.remove('graph-selected');
@@ -82,33 +77,16 @@ export function createUnifiedGraphView({
         applyOverlay();
         if (selectedId && (structure.nodesById.has(selectedId) || structure.edgesById.has(selectedId))) setSelected(selectedId);
         else selectedId = null;
-        onLimitedState(false);
-    }
-
-    function scheduleLimitedNotice() {
-        if (limitedTimer !== null || structure) return;
-        limitedTimer = setTimeout(() => { limitedTimer = null; if (!structure) onLimitedState(true); }, limitedDelayMs);
     }
 
     async function onAnalysisState(state) {
         if (state.model?.nodes?.length) {
-            if (limitedTimer !== null) clearTimeout(limitedTimer);
-            limitedTimer = null;
             if ((state.model.analysisHash || state.model.contentHash) !== renderedHash) await renderStructure(state.model);
             return;
         }
         if (state.model && (state.model.analysisHash || state.model.contentHash) !== renderedHash) {
             renderedHash = state.model.analysisHash || state.model.contentHash;
             onStructure(createGraphStructure(state.model));
-        }
-        const lacksUsableStructure = state.status === 'ready' || !state.lastValidModel;
-        if (lacksUsableStructure && ['unavailable', 'invalid', 'error', 'ready'].includes(state.status)) {
-            scheduleLimitedNotice();
-            if (!fallbackStarted) {
-                fallbackStarted = true;
-                await loadFallback();
-                container.dataset.graphSource = 'recursive';
-            }
         }
     }
 
@@ -165,7 +143,6 @@ export function createUnifiedGraphView({
         getStructure: () => structure,
         dispose() {
             renderGeneration += 1;
-            if (limitedTimer !== null) clearTimeout(limitedTimer);
             unsubscribe();
         },
     };

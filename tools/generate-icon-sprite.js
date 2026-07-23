@@ -5,7 +5,7 @@ const path = require('node:path');
 const ICONS = ['alert-triangle', 'check', 'chevron-down', 'chevron-up', 'focus-2', 'refresh', 'x'];
 const root = path.resolve(__dirname, '..');
 const sourceRoot = path.join(root, 'node_modules', '@tabler', 'icons', 'icons', 'outline');
-const output = path.join(root, 'assets', 'icons.svg');
+const output = path.join(root, 'runtime', 'assets', 'icons.svg');
 
 function symbol(name) {
   const file = path.join(sourceRoot, `${name}.svg`);

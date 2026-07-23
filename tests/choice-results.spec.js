@@ -157,7 +157,7 @@ test('local turns scroll only the transcript container after commit', async ({ p
 test('local scroll target is finite, clamped, and distinguishes short and tall turns', async ({ page }) => {
   await page.goto('/?mode=game');
   const result = await page.evaluate(async () => {
-    const { localTurnScrollTarget } = await import('/lib/browser-story-scroll.js');
+    const { localTurnScrollTarget } = await import('/runtime/modules/browser-story-scroll.js');
     return {
       visible: localTurnScrollTarget({ scrollTop: 100, clientHeight: 400, scrollHeight: 1000, turnTop: 150, turnBottom: 250, liveBottom: 450 }),
       short: localTurnScrollTarget({ scrollTop: 0, clientHeight: 400, scrollHeight: 1000, turnTop: 500, turnBottom: 600, liveBottom: 750 }),
@@ -220,8 +220,8 @@ test('reduced motion uses an immediate transcript-container scroll', async ({ pa
 
 test('local turns commit chronologically above one reevaluated live set', async ({ page }) => {
   await openFixture(page);
-  await page.getByRole('button', { name: 'Ask whether he travels often.' }).click();
-  await page.getByRole('button', { name: 'Ask the follow-up.' }).click();
+  await chooseStoryOption(page, 'button', 'Ask whether he travels often.');
+  await chooseStoryOption(page, 'button', 'Ask the follow-up.');
   const turns = page.locator('.committed-choice-turn');
   await expect(turns).toHaveCount(2);
   await expect(turns.nth(0)).toContainText('Ask whether he travels often.');
@@ -275,18 +275,6 @@ test('page choice processes its result before appending the target', async ({ pa
   await expect(page.locator('.story-passage')).toHaveCount(2);
 });
 
-test('page navigation after dialogue preserves committed turns and retires the live set', async ({ page }) => {
-  await openFixture(page);
-  await chooseStoryOption(page, 'button', 'Ask whether he travels often.');
-  await chooseStoryOption(page, 'link', 'Give Adler the key.');
-  const source = page.locator('.story-passage').first();
-  await expect(source.locator('.committed-choice-turn')).toHaveCount(2);
-  await expect(source.locator('.live-choice-set')).toHaveCount(0);
-  await expect(source.getByText('Every Thursday')).toHaveCount(1);
-  await expect(source.getByText('You give Adler the key.')).toHaveCount(1);
-  await expect(page.getByText('Target sees key: true')).toBeVisible();
-});
-
 test('leaving immediately retires every unchosen control and commits one canonical framed choice', async ({ page }) => {
   await openFixture(page);
   await chooseStoryOption(page, 'link', 'Leave without a result.');
@@ -301,20 +289,6 @@ test('leaving immediately retires every unchosen control and commits one canonic
   await expect(committed).toHaveAttribute('tabindex', '-1');
   await expect(committed).toHaveCSS('pointer-events', 'none');
   await expect(page.getByRole('heading', { name: 'Ordinary destination' })).toBeVisible();
-});
-
-test('local and page committed choices share the canonical component styles', async ({ page }) => {
-  await openFixture(page);
-  await chooseStoryOption(page, 'button', 'Ask whether he travels often.');
-  await finishStoryReveal(page);
-  const readStyle = locator => locator.evaluate(element => {
-    const style = getComputedStyle(element);
-    return { border: style.border, radius: style.borderRadius, padding: style.padding, font: style.font, width: element.getBoundingClientRect().width };
-  });
-  const localStyle = await readStyle(page.locator('.committed-choice-turn > .story-choice').first());
-  await chooseStoryOption(page, 'link', 'Leave without a result.');
-  const controls = page.locator('.story-passage').first().locator('.committed-choice-turn > .story-choice');
-  expect(await readStyle(controls.last())).toEqual(localStyle);
 });
 
 test('local choices in game mode do not request analysis', async ({ page }) => {

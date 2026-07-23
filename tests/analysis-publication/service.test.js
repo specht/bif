@@ -37,7 +37,7 @@ test("shared service analyzes once and publishes the returned model", async () =
     assert.equal(result.analysisHash, result.publication.analysisHash);
     assert.deepEqual(result.summary, result.publication.summary);
     assert.equal(result.analysis.summary.pages, result.summary.pages);
-    assert.equal(result.publication.schemaVersion, 1);
+    assert.equal(result.publication.schemaVersion, 2);
     assert.ok(!result.serialized.includes(root));
     assert.ok(!result.serialized.includes("vscode://"));
     assert.ok(result.publication.diagnostics.every(item => !path.isAbsolute(item.file)));
