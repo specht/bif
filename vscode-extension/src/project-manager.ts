@@ -14,9 +14,14 @@ import {
 } from "./core";
 import { groupedDiagnostics } from "./diagnostics-adapter";
 
-const { publishProjectAnalysis } = require("../../tools/lib/publish-project-analysis") as {
+const publicationService = require("../../tools/lib/publish-project-analysis") as {
   publishProjectAnalysis: ProjectAnalysisPublisher;
 };
+const extensionPackage = require("../package.json") as { displayName: string; version: string };
+const publishProjectAnalysis: ProjectAnalysisPublisher = (root, options) => publicationService.publishProjectAnalysis(root, {
+  ...options,
+  publisher: { name: extensionPackage.displayName, version: extensionPackage.version, source: "vscode-extension" },
+});
 
 export interface ManagedProject {
   folder: vscode.WorkspaceFolder;

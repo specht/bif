@@ -109,7 +109,9 @@ export function mountBrowserAnalysisSummary({ graphContainer, client }) {
             } else if (['unavailable', 'invalid', 'error'].includes(state.status)) {
                 note.textContent = state.status === 'unavailable'
                     ? 'Authoring analysis is unavailable. Install/enable the BIF Authoring Tools extension, or run npm run dev.'
-                    : `Authoring analysis is invalid (${state.message}). Install/enable the BIF Authoring Tools extension, or run npm run dev.`;
+                    : state.message?.startsWith('Authoring analysis uses unsupported schema')
+                        ? state.message
+                        : `Authoring analysis is invalid (${state.message}). Install/enable the BIF Authoring Tools extension, or run npm run dev.`;
             } else note.textContent = '';
             status.hidden = note.textContent.length === 0;
             return;
@@ -124,7 +126,9 @@ export function mountBrowserAnalysisSummary({ graphContainer, client }) {
         } else if (state.status === 'unavailable') {
             message.textContent = 'Authoring analysis is unavailable. Install/enable the BIF Authoring Tools extension, or run npm run dev.';
         } else if (state.status === 'invalid') {
-            message.textContent = `Authoring analysis is invalid (${state.message}). Install/enable the BIF Authoring Tools extension, or run npm run dev.`;
+            message.textContent = state.message?.startsWith('Authoring analysis uses unsupported schema')
+                ? state.message
+                : `Authoring analysis is invalid (${state.message}). Install/enable the BIF Authoring Tools extension, or run npm run dev.`;
         } else {
             message.textContent = `Project analysis could not be loaded: ${state.message}.`;
         }

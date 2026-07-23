@@ -1,5 +1,7 @@
 {
   "name": "interactive-fiction-player",
+  "displayName": "BIF Authoring Tools",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "test": "npm run test:analyzer && npm run test:publication && npm run test:graph && npm run test:browser",

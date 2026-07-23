@@ -5,6 +5,7 @@ const path = require("node:path");
 const { test } = require("node:test");
 const { analyzeStory } = require("../../tools/lib/story-analyzer");
 const { buildBrowserAnalysisPublication } = require("../../tools/lib/browser-analysis-publication");
+const { ANALYSIS_SCHEMA_VERSION } = require("../../tools/lib/analysis-schema");
 const {
   ProjectAnalysisError,
   publishProjectAnalysis,
@@ -37,7 +38,8 @@ test("shared service analyzes once and publishes the returned model", async () =
     assert.equal(result.analysisHash, result.publication.analysisHash);
     assert.deepEqual(result.summary, result.publication.summary);
     assert.equal(result.analysis.summary.pages, result.summary.pages);
-    assert.equal(result.publication.schemaVersion, 2);
+    assert.equal(result.publication.schemaVersion, ANALYSIS_SCHEMA_VERSION);
+    assert.deepEqual(result.publication.publisher, { name: "BIF Authoring Tools", version: "0.1.0", source: "npm-watch" });
     assert.ok(!result.serialized.includes(root));
     assert.ok(!result.serialized.includes("vscode://"));
     assert.ok(result.publication.diagnostics.every(item => !path.isAbsolute(item.file)));
@@ -79,6 +81,17 @@ test("analysis identity tracks meaningful output independently of source identit
   assert.equal(identical.analysisHash, first.analysisHash);
   assert.equal(changed.contentHash, first.contentHash);
   assert.notEqual(changed.analysisHash, first.analysisHash);
+});
+
+test("npm and extension writers share schema 2 and semantic analysis identity", async () => {
+  const analysis = await analyzeStory(fixture("complete-project"));
+  const npm = buildBrowserAnalysisPublication(analysis, { publisher: { name: "BIF Authoring Tools", version: "0.1.0", source: "npm-watch" } });
+  const extension = buildBrowserAnalysisPublication(analysis, { publisher: { name: "BIF Authoring Tools", version: "0.1.0", source: "vscode-extension" } });
+  assert.equal(npm.schemaVersion, ANALYSIS_SCHEMA_VERSION);
+  assert.equal(extension.schemaVersion, ANALYSIS_SCHEMA_VERSION);
+  assert.equal(npm.analysisHash, extension.analysisHash);
+  assert.notDeepEqual(npm.publisher, extension.publisher);
+  assert.throws(() => buildBrowserAnalysisPublication(analysis, { publisher: { name: "old", version: "0.0.1", source: "unknown" } }));
 });
 
 test("changed project atomically replaces valid output without temporary files", async () => {

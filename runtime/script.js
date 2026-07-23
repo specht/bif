@@ -5,6 +5,7 @@ import './modules/choice-result-model.js';
 import { localTurnScrollTarget } from './modules/browser-story-scroll.js';
 import { createStoryRevealController, planLocalTurnReveal, planPageReveal } from './modules/browser-story-reveal.js';
 import { createIcon } from './modules/browser-icons.js';
+import { createHoldToConfirmControl } from './modules/hold-to-confirm.js';
 
 let Graphviz, createBrowserAnalysisClient, mountBrowserAnalysisSummary, matchRuntimeChoices,
     createRuntimeOverlay, createUnifiedGraphView, createProblemsView, createDevelopmentUiState,
@@ -63,6 +64,8 @@ let navigationQueue = Promise.resolve();
 let replayingHistory = false;
 let currentPassageHasNavigation = false;
 let restartControl = null;
+let restartHoldControl = null;
+let playAgainHoldControl = null;
 let contextProgress = false;
 let keyboardNavigationPending = false;
 let graphKeyboardNavigationPending = false;
@@ -1373,8 +1376,6 @@ function hasMeaningfulProgress() {
 }
 
 export async function restartStory() {
-    if (hasMeaningfulProgress()
-        && !window.confirm('Restart the story? Your current progress will be lost.')) return false;
     el.body.classList.add('skip-animations');
     try {
         await restoreSession({ seed: `${randomSeed()}`, events: [{ type: 'page', pageId: '1' }] });
@@ -1399,9 +1400,20 @@ function iconButton({ className, label, icon }) {
 }
 
 function createStoryControls(mode) {
+    restartHoldControl?.destroy();
+    playAgainHoldControl?.destroy();
     el.storyControls.replaceChildren();
-    restartControl = iconButton({ className: 'story-restart-control', label: 'Restart story', icon: 'refresh' });
-    restartControl.addEventListener('click', () => void restartStory());
+    restartControl = iconButton({ className: 'story-restart-control hold-confirm-control', label: 'Hold to restart story', icon: 'refresh' });
+    restartHoldControl = createHoldToConfirmControl({
+        button: restartControl,
+        shouldRequireHold: hasMeaningfulProgress,
+        onConfirm: restartStory,
+        labels: {
+            idle: 'Hold to restart story',
+            holding: 'Release to cancel restart',
+            confirming: 'Restarting story',
+        },
+    });
     el.storyControls.append(restartControl);
 
     if (isAuthoringEnvironment()) {
@@ -1419,9 +1431,17 @@ function createStoryControls(mode) {
 
     const playAgain = document.createElement('button');
     playAgain.type = 'button';
-    playAgain.className = 'story-play-again';
-    playAgain.textContent = 'Play again';
-    playAgain.addEventListener('click', () => void restartStory());
+    playAgain.className = 'story-play-again hold-confirm-control';
+    playAgain.textContent = 'Hold to play again';
+    playAgainHoldControl = createHoldToConfirmControl({
+        button: playAgain,
+        onConfirm: restartStory,
+        labels: {
+            idle: 'Hold to play again',
+            holding: 'Release to cancel play again',
+            confirming: 'Restarting story',
+        },
+    });
     el.endingActions.replaceChildren(playAgain);
 }
 

@@ -4,9 +4,11 @@ import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import storyAnalyzer from '../tools/lib/story-analyzer.js';
 import publicationTools from '../tools/lib/browser-analysis-publication.js';
+import schemaTools from '../tools/lib/analysis-schema.js';
 
 const { analyzeStory } = storyAnalyzer;
 const { buildBrowserAnalysisPublication } = publicationTools;
+const { ANALYSIS_SCHEMA_VERSION } = schemaTools;
 const root = process.cwd();
 
 async function publicationFor(project) {
@@ -80,9 +82,32 @@ test('strict schema rejects unsupported and malformed publications safely', asyn
   await page.goto('/?mode=game');
   const results = await page.evaluate(async () => {
     const { validateBrowserAnalysis } = await import('/dev/browser-analysis-client.js');
-    return [validateBrowserAnalysis({ schemaVersion: 1 }), validateBrowserAnalysis(null)].map(item => item.valid);
+    const unsupported = validateBrowserAnalysis({ schemaVersion: 1, publisher: { name: 'BIF Authoring Tools', version: '0.0.1', source: 'vscode-extension' } });
+    return { valid: [unsupported, validateBrowserAnalysis(null)].map(item => item.valid), reason: unsupported.reason };
   });
-  expect(results).toEqual([false, false]);
+  expect(results.valid).toEqual([false, false]);
+  expect(results.reason).toContain(`unsupported schema version 1; this browser expects version ${ANALYSIS_SCHEMA_VERSION}`);
+  expect(results.reason).toContain('last written by BIF Authoring Tools 0.0.1');
+});
+
+test('browser schema expectation equals the authoritative publisher constant and accepts both sources', async ({ page }) => {
+  await page.goto('/?mode=game');
+  const result = await page.evaluate(async publications => {
+    const client = await import('/dev/browser-analysis-client.js');
+    return {
+      expected: client.SUPPORTED_SCHEMA_VERSION,
+      valid: publications.map(value => client.validateBrowserAnalysis(value).valid),
+    };
+  }, [
+    buildBrowserAnalysisPublication(await analyzeStory(path.join(root, 'test-fixtures/authoring-graph/complete-project')), {
+      publisher: { name: 'BIF Authoring Tools', version: '0.1.0', source: 'npm-watch' },
+    }),
+    buildBrowserAnalysisPublication(await analyzeStory(path.join(root, 'test-fixtures/authoring-graph/complete-project')), {
+      publisher: { name: 'BIF Authoring Tools', version: '0.1.0', source: 'vscode-extension' },
+    }),
+  ]);
+  expect(result.expected).toBe(ANALYSIS_SCHEMA_VERSION);
+  expect(result.valid).toEqual([true, true]);
 });
 
 test('local mode preference is path-scoped and production ignores dev override', async ({ page }) => {

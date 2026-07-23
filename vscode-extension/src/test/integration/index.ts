@@ -31,6 +31,7 @@ export async function run(): Promise<void> {
   await waitFor(() => exists(analysisPath));
   const initialPublication = JSON.parse(await fs.readFile(analysisPath, "utf8"));
   assert.equal(initialPublication.schemaVersion, 2);
+  assert.deepEqual(initialPublication.publisher, { name: "BIF Authoring Tools", version: "0.1.0", source: "vscode-extension" });
   assert.ok(initialPublication.inputManifest.some((entry: any) => entry.path === "config.js"));
   assert.equal(initialPublication.summary.pages, project.result.summary.pages);
   assert.equal(initialPublication.summary.errors, project.result.summary.errors);
@@ -38,11 +39,13 @@ export async function run(): Promise<void> {
   assert.ok(!JSON.stringify(initialPublication).includes(root));
   assert.ok(!JSON.stringify(initialPublication).includes("vscode://"));
   assert.ok(!JSON.stringify(initialPublication).includes("story-code-executed"));
-  const extensionBytes = await fs.readFile(analysisPath);
   const directPublication = await publishProjectAnalysis(root);
-  const directBytes = await fs.readFile(analysisPath);
-  assert.deepEqual(directBytes, extensionBytes, "extension and shared direct publication must be byte-identical");
+  assert.deepEqual(directPublication.publication.publisher, { name: "BIF Authoring Tools", version: "0.1.0", source: "npm-watch" });
+  const { publisher: extensionPublisher, ...extensionSemantic } = initialPublication;
+  const { publisher: directPublisher, ...directSemantic } = directPublication.publication;
+  assert.deepEqual(directSemantic, extensionSemantic, "extension and npm publication semantics must be byte-compatible");
   assert.equal(directPublication.contentHash, initialPublication.contentHash);
+  assert.equal(directPublication.analysisHash, initialPublication.analysisHash);
   await fs.writeFile(path.join(root, "pages", "99.md"), "# Created target\n", "utf8");
   await waitFor(() => !allDiagnostics().some(item => String(item.code) === "missing-page"));
   await waitFor(async () => JSON.parse(await fs.readFile(analysisPath, "utf8")).contentHash !== initialPublication.contentHash);

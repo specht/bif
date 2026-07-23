@@ -403,18 +403,19 @@ button {
     gap: 0.3rem;
     margin-inline-end: 0.3rem;
     padding: 0.25rem;
-    border: 1px solid var(--mix-80);
+    border: 1px solid var(--border-color);
     border-radius: 0.55rem;
-    background: color-mix(in srgb, var(--bg-color) 88%, transparent);
-    box-shadow: 0 0.08rem 0.3rem var(--shadow-color);
+    background: var(--surface-1);
+    box-shadow: 0 0.125rem 0.5rem var(--shadow-color);
     pointer-events: auto;
-    transition: background-color 120ms ease, border-color 120ms ease;
+    opacity: 1;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .story-controls:hover,
 .story-controls:focus-within {
-    background: var(--bg-color);
-    border-color: var(--mix-65);
+    border-color: var(--border-strong);
+    box-shadow: 0 0.18rem 0.65rem var(--shadow-color);
 }
 
 .story-icon-button {
@@ -428,7 +429,7 @@ button {
     border: 1px solid transparent;
     border-radius: 0.4rem;
     background: transparent;
-    color: var(--mix-35);
+    color: var(--fg-color);
     font: inherit;
     cursor: pointer;
 }
@@ -436,6 +437,37 @@ button {
 .story-icon-button .icon {
     width: 1.15rem;
     height: 1.15rem;
+    color: currentColor;
+    opacity: 1;
+}
+
+.hold-confirm-control {
+    --hold-progress: 0turn;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+}
+
+.hold-confirm-control::after {
+    content: '';
+    position: absolute;
+    inset: 0.12rem;
+    z-index: -1;
+    border-radius: inherit;
+    background: conic-gradient(var(--fg-color) var(--hold-progress), transparent 0);
+    opacity: 0;
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 0.16rem), #000 0);
+    mask: radial-gradient(farthest-side, transparent calc(100% - 0.16rem), #000 0);
+}
+
+.hold-confirm-control.is-holding::after,
+.hold-confirm-control.is-confirming::after { opacity: 0.8; }
+
+@media (prefers-reduced-motion: reduce) {
+    .hold-confirm-control.is-holding::after {
+        background: none;
+        border: 0.16rem solid var(--fg-color);
+    }
 }
 
 .story-icon-button:hover {

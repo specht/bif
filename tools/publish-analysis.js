@@ -2,6 +2,9 @@
 const path = require("node:path");
 const { publishProjectAnalysis } = require("./lib/publish-project-analysis");
 const { startProjectAnalysisWatch } = require("./lib/watch-project-analysis");
+const packageMetadata = require("../package.json");
+
+const NPM_PUBLISHER = Object.freeze({ name: packageMetadata.displayName || packageMetadata.name, version: packageMetadata.version, source: "npm-watch" });
 
 const USAGE = "Usage: npm run dev -- [--project PATH]";
 
@@ -42,6 +45,7 @@ async function main(argv = process.argv.slice(2)) {
         console.log(`SHA-256: ${result.contentHash}`);
       };
       const watcher = await startProjectAnalysisWatch(options.project, {
+        publishOptions: { publisher: NPM_PUBLISHER },
         onResult: report,
         onError: error => console.error(`Analysis publication failed (${error.code || 'watch-error'}): ${error.message}\nWatching for fixes…`),
       });
@@ -60,7 +64,7 @@ async function main(argv = process.argv.slice(2)) {
       });
       return 0;
     }
-    const result = await publishProjectAnalysis(options.project);
+    const result = await publishProjectAnalysis(options.project, { publisher: NPM_PUBLISHER });
     console.log("Published .story-tools/analysis.json");
     console.log(`${result.summary.pages} pages · ${result.summary.choices} choices · ${result.summary.errors} errors · ${result.summary.warnings} warnings`);
     console.log(`SHA-256: ${result.contentHash}`);
@@ -76,4 +80,4 @@ if (require.main === module) {
   main().then(code => { process.exitCode = code; });
 }
 
-module.exports = { main, parseArguments, USAGE };
+module.exports = { main, parseArguments, USAGE, NPM_PUBLISHER };

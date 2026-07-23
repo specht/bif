@@ -1,4 +1,4 @@
-const SUPPORTED_SCHEMA_VERSION = 2;
+export const SUPPORTED_SCHEMA_VERSION = 2;
 const SUMMARY_FIELDS = [
     'pages',
     'reachablePages',
@@ -10,6 +10,7 @@ const SUMMARY_FIELDS = [
     'warnings',
 ];
 const DIAGNOSTIC_SEVERITIES = new Set(['error', 'warning', 'information', 'info', 'hint']);
+const PUBLISHER_SOURCES = new Set(['npm-watch', 'vscode-extension']);
 export const FAST_RETRY_DELAYS_MS = [250, 250, 500, 500, 1000];
 export const MONITOR_INTERVAL_MS = 4000;
 const DEFAULT_REFRESH_DEBOUNCE_MS = 300;
@@ -26,15 +27,26 @@ export function analysisIdentity(model) {
 export function validateBrowserAnalysis(value) {
     if (!isObject(value)) return { valid: false, reason: 'invalid top-level value' };
     if (value.schemaVersion !== SUPPORTED_SCHEMA_VERSION) {
+        const writer = isObject(value.publisher)
+            && typeof value.publisher.name === 'string'
+            && typeof value.publisher.version === 'string'
+            ? ` It was last written by ${value.publisher.name} ${value.publisher.version}.`
+            : '';
         return {
             valid: false,
             reason: Number.isInteger(value.schemaVersion)
-                ? `unsupported schema version ${value.schemaVersion}`
+                ? `Authoring analysis uses unsupported schema version ${value.schemaVersion}; this browser expects version ${SUPPORTED_SCHEMA_VERSION}.${writer} Update/reinstall the extension or run npm run dev.`
                 : 'invalid schema version',
         };
     }
     if (typeof value.contentHash !== 'string' || value.contentHash.trim().length === 0) {
         return { valid: false, reason: 'invalid content hash' };
+    }
+    if (value.publisher !== undefined && (!isObject(value.publisher)
+        || typeof value.publisher.name !== 'string'
+        || typeof value.publisher.version !== 'string'
+        || !PUBLISHER_SOURCES.has(value.publisher.source))) {
+        return { valid: false, reason: 'invalid publisher metadata' };
     }
     if (!/^[a-f0-9]{64}$/.test(value.analysisHash || '')) {
         return { valid: false, reason: 'invalid analysis hash' };

@@ -28,7 +28,7 @@ export interface PublishedProjectAnalysis {
 
 export type ProjectAnalysisPublisher = (
   root: string,
-  options: { generation: number; isCurrent(): boolean },
+  options: { generation: number; isCurrent(): boolean; publisher?: { name: string; version: string; source: string } },
 ) => Promise<PublishedProjectAnalysis>;
 
 export async function publishCurrentGeneration(

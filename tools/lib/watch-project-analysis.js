@@ -14,6 +14,7 @@ function ignoredPath(projectRoot, candidate) {
 
 async function startProjectAnalysisWatch(projectRoot, options = {}) {
   const publish = options.publish || publishProjectAnalysis;
+  const publishOptions = options.publishOptions || {};
   const debounceMs = options.debounceMs ?? 150;
   const onResult = options.onResult || (() => {});
   const onError = options.onError || (() => {});
@@ -40,7 +41,7 @@ async function startProjectAnalysisWatch(projectRoot, options = {}) {
       do {
         rerun = false;
         try {
-          const result = await publish(projectRoot);
+          const result = await publish(projectRoot, publishOptions);
           await updateWatchedStory(result);
           onResult(result);
         }
@@ -57,7 +58,7 @@ async function startProjectAnalysisWatch(projectRoot, options = {}) {
     timer = setTimeout(() => { timer = null; void run(); }, debounceMs);
   }
 
-  const initial = await publish(projectRoot);
+  const initial = await publish(projectRoot, publishOptions);
   onResult(initial);
   watchedPagesPath = initial.analysis?.project?.pagesPath || "pages";
   watcher = chokidar.watch([path.join(projectRoot, "config.js"), path.join(projectRoot, watchedPagesPath)], {

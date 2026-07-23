@@ -1,6 +1,7 @@
 const crypto = require("node:crypto");
 const path = require("node:path");
 const { buildAuthoringGraph } = require("./authoring-graph-model");
+const { ANALYSIS_SCHEMA_VERSION, ANALYSIS_PUBLISHER_SOURCES } = require("./analysis-schema");
 
 function sanitizeDiagnostic(item) {
   const result = {
@@ -19,10 +20,10 @@ function sanitizeDiagnostic(item) {
   return result;
 }
 
-function buildBrowserAnalysisPublication(analysis) {
+function buildBrowserAnalysisPublication(analysis, options = {}) {
   const model = buildAuthoringGraph(analysis);
   const content = {
-    schemaVersion: 2,
+    schemaVersion: ANALYSIS_SCHEMA_VERSION,
     inputManifest: analysis.inputManifest.map(entry => ({ path: entry.path, sha256: entry.sha256 })),
     project: {
       title: model.project.title,
@@ -96,12 +97,14 @@ function buildBrowserAnalysisPublication(analysis) {
     contentHash,
     analysisHash,
   };
+  if (options.publisher) publication.publisher = sanitizePublisher(options.publisher);
   validateBrowserAnalysisPublication(publication);
   return publication;
 }
 
 function validateBrowserAnalysisPublication(publication) {
-  if (publication.schemaVersion !== 2) throw new Error("Unsupported browser analysis schema");
+  if (publication.schemaVersion !== ANALYSIS_SCHEMA_VERSION) throw new Error("Unsupported browser analysis schema");
+  if (publication.publisher) sanitizePublisher(publication.publisher);
   if (!Array.isArray(publication.inputManifest) || publication.inputManifest.length === 0) throw new Error("Browser analysis inputManifest must not be empty");
   for (const entry of publication.inputManifest) {
     if (!entry || typeof entry.path !== "string" || !/^[a-f0-9]{64}$/.test(entry.sha256)) throw new Error("Invalid browser analysis manifest entry");
@@ -124,6 +127,15 @@ function validateBrowserAnalysisPublication(publication) {
     }
   }
   if (canonicalJson(publication).includes("vscode://")) throw new Error("Browser analysis must not contain VS Code URIs");
+}
+
+function sanitizePublisher(publisher) {
+  if (!publisher || typeof publisher.name !== "string" || !publisher.name.trim()
+      || typeof publisher.version !== "string" || !/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(publisher.version)
+      || !ANALYSIS_PUBLISHER_SOURCES.includes(publisher.source)) {
+    throw new Error("Invalid browser analysis publisher metadata");
+  }
+  return { name: publisher.name, version: publisher.version, source: publisher.source };
 }
 
 function canonicalJson(value) {
@@ -153,4 +165,5 @@ module.exports = {
   canonicalJson,
   sanitizeDiagnostic,
   validateBrowserAnalysisPublication,
+  sanitizePublisher,
 };

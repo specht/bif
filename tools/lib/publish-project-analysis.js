@@ -2,6 +2,13 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { analyzeStory } = require("./story-analyzer");
 const { buildBrowserAnalysisPublication, canonicalJson } = require("./browser-analysis-publication");
+const packageMetadata = require("../../package.json");
+
+const DEFAULT_NPM_PUBLISHER = Object.freeze({
+  name: packageMetadata.displayName || packageMetadata.name,
+  version: packageMetadata.version,
+  source: "npm-watch",
+});
 
 let temporarySequence = 0;
 
@@ -91,7 +98,7 @@ async function publishProjectAnalysis(projectRoot = process.cwd(), options = {})
   let publication;
   let serialized;
   try {
-    publication = (options.buildPublication || buildBrowserAnalysisPublication)(analysis);
+    publication = (options.buildPublication || buildBrowserAnalysisPublication)(analysis, { publisher: options.publisher || DEFAULT_NPM_PUBLISHER });
     serialized = canonicalJson(publication);
   } catch (cause) {
     throw errorFor("publication-invalid", `Could not build analysis publication for ${root}`, root, cause);
@@ -121,4 +128,5 @@ module.exports = {
   publishProjectAnalysis,
   validateProjectRoot,
   writeAnalysisAtomically,
+  DEFAULT_NPM_PUBLISHER,
 };
