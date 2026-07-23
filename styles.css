@@ -24,13 +24,15 @@
   --graph-route-color: #111;
   --graph-edge-color: #62676d;
   --graph-label-color: #202124;
-  --graph-cluster-fill-opacity: 0.26;
   --graph-cluster-stroke-opacity: 0.78;
-  --graph-node-fill-opacity: 0.66;
-  --graph-node-stroke-opacity: 0.86;
-  --graph-muted-node-fill-opacity: 0.38;
+  --graph-node-tint-strength: 72%;
+  --graph-node-stroke-opacity: 0.88;
+  --graph-muted-node-tint-strength: 48%;
+  --graph-cluster-tint-strength: 38%;
+  --graph-muted-label-opacity: 0.68;
   --graph-error-color: #b42318;
   --graph-warning-color: #9a6700;
+  --graph-background: var(--bg-color);
 
   --choice-gap: 0.625rem;
   --choice-result-gap: 0.375rem;
@@ -62,13 +64,15 @@
         --graph-route-color: #f2f2f2;
         --graph-edge-color: #9aa0a6;
         --graph-label-color: #f1f3f4;
-        --graph-cluster-fill-opacity: 0.22;
-        --graph-cluster-stroke-opacity: 0.72;
-        --graph-node-fill-opacity: 0.48;
-        --graph-node-stroke-opacity: 0.82;
-        --graph-muted-node-fill-opacity: 0.30;
+        --graph-cluster-stroke-opacity: 0.82;
+        --graph-node-tint-strength: 42%;
+        --graph-node-stroke-opacity: 0.92;
+        --graph-muted-node-tint-strength: 28%;
+        --graph-cluster-tint-strength: 5%;
+        --graph-muted-label-opacity: 0.76;
         --graph-error-color: #ff7b72;
         --graph-warning-color: #f2cc60;
+        --graph-background: #111;
     }
 }
 
@@ -745,13 +749,38 @@ body.dev {
                         opacity: 1;
                     }
 
+                    /*
+                     * Graphviz supplies the group hue. JavaScript stores it in
+                     * --graph-group-color / --graph-node-source-fill so CSS can
+                     * compose the same graph for light and dark backgrounds.
+                     *
+                     * Clusters are frames only: a large tinted background made
+                     * the dark graph muddy and reduced label contrast.
+                     */
                     .graph-cluster-shape {
-                        fill-opacity: var(--graph-cluster-fill-opacity) !important;
+                        fill: color-mix(
+                            in srgb,
+                            var(--graph-cluster-source-fill, var(--graph-group-color))
+                                var(--graph-cluster-tint-strength),
+                            var(--graph-background)
+                        ) !important;
+
+                        fill-opacity: 1 !important;
+
+                        stroke: var(--graph-group-color, currentColor) !important;
                         stroke-opacity: var(--graph-cluster-stroke-opacity) !important;
+                        stroke-width: 1.35px;
                     }
 
                     .graph-node-shape {
-                        fill-opacity: var(--graph-node-fill-opacity) !important;
+                        fill: color-mix(
+                            in srgb,
+                            var(--graph-node-source-fill, var(--graph-group-color))
+                                var(--graph-node-tint-strength),
+                            var(--bg-color)
+                        ) !important;
+                        fill-opacity: 1 !important;
+                        stroke: var(--graph-group-color, currentColor) !important;
                         stroke-opacity: var(--graph-node-stroke-opacity) !important;
                     }
 
@@ -759,6 +788,7 @@ body.dev {
                     .graph-node-label,
                     .graph-edge-label {
                         fill: var(--graph-label-color) !important;
+                        opacity: 1;
                     }
 
                     .node {
@@ -771,10 +801,16 @@ body.dev {
 
                         &:not(.active):not(.current):not(.available):not(.graph-selected) {
                             .graph-node-shape {
-                                fill-opacity: var(--graph-muted-node-fill-opacity) !important;
-                                stroke-opacity: 0.48 !important;
+                                fill: color-mix(
+                                    in srgb,
+                                    var(--graph-node-source-fill, var(--graph-group-color))
+                                        var(--graph-muted-node-tint-strength),
+                                    var(--bg-color)
+                                ) !important;
+                                fill-opacity: 1 !important;
+                                stroke-opacity: 0.52 !important;
                             }
-                            .graph-node-label { opacity: 0.62; }
+                            .graph-node-label { opacity: var(--graph-muted-label-opacity); }
                         }
 
                         &:hover,
@@ -975,5 +1011,16 @@ body,
 
     #graph-container {
         background: #111;
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    #graph-container .graph-node-shape {
+        filter: saturate(1.08);
+    }
+
+    #graph-container .edge.active .graph-edge-path,
+    #graph-container .edge.active .graph-edge-arrow {
+        filter: drop-shadow(0 0 0.35px rgba(0, 0, 0, 0.95));
     }
 }
