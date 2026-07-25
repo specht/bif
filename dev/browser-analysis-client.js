@@ -1,3 +1,5 @@
+import { sha256Hex } from './browser-sha256.js';
+
 export const SUPPORTED_SCHEMA_VERSION = 2;
 const SUMMARY_FIELDS = [
     'pages',
@@ -92,7 +94,6 @@ export function createBrowserAnalysisClient({
     windowObject = window,
     setTimeoutImplementation = window.setTimeout.bind(window),
     clearTimeoutImplementation = window.clearTimeout.bind(window),
-    cryptoObject = globalThis.crypto,
     now = Date.now,
 } = {}) {
     let requestGeneration = 0;
@@ -151,9 +152,8 @@ export function createBrowserAnalysisClient({
         publish(failureState(status, message));
     }
 
-    async function sha256(bytes) {
-        const digest = await cryptoObject.subtle.digest('SHA-256', bytes);
-        return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('');
+    function sha256(bytes) {
+        return sha256Hex(bytes);
     }
 
     async function verifyManifest(model, reason) {

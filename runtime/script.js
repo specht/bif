@@ -913,9 +913,8 @@ async function appendPage(page, generation = sessionGeneration) {
 }
 
 function randomSeed() {
-    const array = new Uint32Array(1);
-    crypto.getRandomValues(array);
-    return array[0];
+    // The seed is used for reproducible story state, not for security.
+    return Math.floor(Math.random() * 0x100000000);
 }
 
 async function loadPage(page) {
