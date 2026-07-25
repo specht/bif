@@ -1,7 +1,7 @@
 const STORAGE_VERSION = 1;
 
 export function isAuthoringEnvironment(locationObject = window.location) {
-    return Boolean(locationObject.port);
+    return Boolean(locationObject.port) || locationObject.hostname.indexOf('workspace.hackschule.de') >= 0;
 }
 
 export function modePreferenceKey(locationObject = window.location) {
