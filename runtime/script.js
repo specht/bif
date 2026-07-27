@@ -1485,7 +1485,7 @@ export async function init() {
     }
     createStoryControls(devMode ? 'dev' : 'game');
 
-    Math.w6 = () => Math.floor(Math.rand() * 6) + 1;
+    Math.w6 = () => Math.floor(Math.random() * 6) + 1;
     Math.chance = (x) => Math.random() * 100 < x;
     const urlSession = decodeSession();
     try {
