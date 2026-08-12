@@ -915,11 +915,6 @@ body.dev {
                             .graph-node-label { opacity: 1; }
                         }
 
-                        &.active .graph-node-shape {
-                            stroke: var(--graph-active-color) !important;
-                            stroke-opacity: 1 !important;
-                        }
-
                         &.current .graph-node-shape,
                         &.graph-selected .graph-node-shape {
                             stroke: var(--graph-active-color) !important;

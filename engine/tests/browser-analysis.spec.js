@@ -78,6 +78,23 @@ test('changed input marks the retained graph stale and recovery clears it', asyn
   expect(publication.schemaVersion).toBe(2);
 });
 
+test('an initially stale publication is not rendered as the current graph', async ({ page }) => {
+  const { publication, config } = await configureFixture(page, 'engine/test-fixtures/authoring-graph/complete-project');
+  let changed = true;
+  await page.unroute(/\/config\.js(?:\?.*)?$/);
+  await page.route(/\/config\.js(?:\?.*)?$/, route => route.fulfill({
+    contentType: 'text/javascript',
+    body: changed ? `${config}\n// edited` : config,
+  }));
+  await page.goto('/?mode=dev');
+  await expect(page.locator('#project-analysis-status')).toContainText('Authoring analysis is out of date');
+  await expect(page.locator('#graph-container')).not.toHaveAttribute('data-graph-source', 'analysis');
+  changed = false;
+  await page.getByRole('button', { name: 'Retry' }).click();
+  await expect(page.locator('#node_1')).toBeVisible();
+  expect(publication.schemaVersion).toBe(2);
+});
+
 test('strict schema rejects unsupported and malformed publications safely', async ({ page }) => {
   await page.goto('/?mode=game');
   const results = await page.evaluate(async () => {

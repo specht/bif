@@ -80,6 +80,10 @@ export function createUnifiedGraphView({
     }
 
     async function onAnalysisState(state) {
+        // The story itself is read directly from the Markdown files, while the
+        // graph comes from the asynchronously generated analysis publication.
+        // Never install an out-of-date graph during that short save/reload race.
+        if (state.status !== 'ready') return;
         if (state.model?.nodes?.length) {
             if ((state.model.analysisHash || state.model.contentHash) !== renderedHash) await renderStructure(state.model);
             return;
