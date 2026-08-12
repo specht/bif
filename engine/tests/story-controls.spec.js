@@ -25,7 +25,7 @@ test('compact controls are accessible chrome outside the transcript in both loca
   const toolbar = page.getByLabel('Story controls');
   const restart = page.locator('.story-restart-control');
   const authoring = page.getByRole('button', { name: 'Open authoring view' });
-  await expect(restart).toHaveAttribute('title', 'Hold to restart story');
+  await expect(restart).toHaveAttribute('title', 'Gedrückt halten, um die Geschichte neu zu starten');
   await expect(authoring).toHaveAttribute('title', 'Open authoring view');
   await expect(restart.locator('svg')).toHaveAttribute('aria-hidden', 'true');
   await expect(authoring.locator('svg')).toHaveAttribute('aria-hidden', 'true');
@@ -46,7 +46,7 @@ test('compact controls are accessible chrome outside the transcript in both loca
   await restart.focus();
   await expect(restart).toBeFocused();
   await page.goto('/?mode=dev');
-  await expect(page.getByRole('button', { name: 'Hold to restart story' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Gedrückt halten, um die Geschichte neu zu starten' })).toBeVisible();
   const game = page.getByRole('button', { name: 'Open game view' });
   await expect(game).toHaveAttribute('title', 'Open game view');
   await expect(game).toHaveText('');
@@ -102,7 +102,8 @@ test('reduced motion retains a visible time-based hold state', async ({ page }) 
   const restart = page.locator('.story-restart-control');
   await restart.dispatchEvent('pointerdown', { pointerId: 11, button: 0, isPrimary: true });
   await expect(restart).toHaveClass(/is-holding/);
-  expect(await restart.evaluate(element => getComputedStyle(element, '::after').borderTopWidth)).not.toBe('0px');
+  expect(await restart.evaluate(element => getComputedStyle(element, '::after').height)).not.toBe('0px');
+  expect(await restart.evaluate(element => getComputedStyle(element, '::after').opacity)).not.toBe('0');
   await restart.dispatchEvent('pointercancel', { pointerId: 11, button: 0, isPrimary: true });
 });
 
@@ -110,9 +111,9 @@ test('restart before progress uses a simple activation and never duplicates cont
   await useStory(page);
   await page.addInitScript(() => { Object.defineProperty(window, 'confirm', { value: () => { throw new Error('native confirmation must not run'); } }); });
   await page.goto('/?mode=game');
-  await page.getByRole('button', { name: 'Hold to restart story' }).click();
+  await page.getByRole('button', { name: 'Gedrückt halten, um die Geschichte neu zu starten' }).click();
   await expect(page.getByRole('heading', { name: 'Start' })).toBeVisible();
-  await page.getByRole('button', { name: 'Hold to restart story' }).click();
+  await page.getByRole('button', { name: 'Gedrückt halten, um die Geschichte neu zu starten' }).click();
   await expect(page.locator('.story-controls')).toHaveCount(1);
   await expect(page.locator('.story-restart-control')).toHaveCount(1);
   await expect(page.locator('#content .story-restart-control, #content .story-play-again')).toHaveCount(0);
@@ -135,7 +136,7 @@ test('progress restart requires a hold; release, pointer cancel, leaving, and Es
   await page.waitForTimeout(150);
   await page.mouse.up();
   await expect(restart).not.toHaveClass(/is-holding/);
-  await expect(restart).toHaveCSS('--hold-progress', '0turn');
+  await expect(restart).toHaveCSS('--hold-progress', '0');
   await page.mouse.down();
   await restart.dispatchEvent('pointercancel', { pointerId: 1, button: 0, isPrimary: true });
   await page.mouse.up();
@@ -153,7 +154,7 @@ test('progress restart requires a hold; release, pointer cancel, leaving, and Es
   await expect(page.getByRole('heading', { name: 'Start' })).toBeVisible();
   const session = await page.evaluate(() => JSON.parse(LZString.decompressFromEncodedURIComponent(location.hash.slice(1))));
   expect(session.events).toEqual([{ type: 'page', pageId: '1' }]);
-  await expect(page.getByRole('button', { name: 'Hold to restart story' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Gedrückt halten, um die Geschichte neu zu starten' })).toBeFocused();
 });
 
 test('keyboard hold confirms while early keyup cancels', async ({ page }) => {
@@ -179,7 +180,7 @@ test('local choices and context are cleared by the shared restart action', async
   await expect(page.getByText(/Every Thursday.*Result 1/)).toBeVisible();
   await expect(page.locator('.committed-choice-turn')).toHaveCount(1);
   await expect(page.locator('#state-container')).toContainText('knows_answer: true');
-  await holdButton(page, page.getByRole('button', { name: 'Hold to restart story' }));
+  await holdButton(page, page.getByRole('button', { name: 'Gedrückt halten, um die Geschichte neu zu starten' }));
   await expect(page.locator('.committed-choice-turn')).toHaveCount(0);
   await expect(page.getByText(/Every Thursday.*Result 1/)).toHaveCount(0);
   await expect(page.locator('#state-container')).toContainText('knows_answer: false');
@@ -193,6 +194,8 @@ test('ending Play again preserves the completed URL until its shared hold confir
   await page.getByRole('link', { name: 'Take the direct route.' }).click();
   const playAgain = page.locator('.story-play-again');
   await expect(playAgain).toBeVisible();
+  await expect(playAgain).toHaveText('Gedrückt halten, um erneut zu spielen');
+  await expect(playAgain).toHaveAttribute('title', 'Gedrückt halten, um erneut zu spielen');
   expect(await playAgain.evaluate(element => !document.querySelector('#content').contains(element))).toBe(true);
   const completedUrl = page.url();
   await playAgain.click();
@@ -200,6 +203,15 @@ test('ending Play again preserves the completed URL until its shared hold confir
   expect(page.url()).toBe(completedUrl);
   await playAgain.dispatchEvent('pointerdown', { pointerId: 20, button: 0, isPrimary: true });
   await page.waitForTimeout(100);
+  const holdFeedback = await playAgain.evaluate(element => ({
+    progress: Number.parseFloat(getComputedStyle(element).getPropertyValue('--hold-progress')),
+    barHeight: getComputedStyle(element, '::after').height,
+    barOpacity: getComputedStyle(element, '::after').opacity,
+  }));
+  expect(holdFeedback.progress).toBeGreaterThan(0);
+  expect(holdFeedback.progress).toBeLessThan(1);
+  expect(holdFeedback.barHeight).not.toBe('0px');
+  expect(holdFeedback.barOpacity).not.toBe('0');
   await playAgain.dispatchEvent('pointerup', { pointerId: 20, button: 0, isPrimary: true });
   expect(page.url()).toBe(completedUrl);
   await holdButton(page, playAgain);
@@ -218,7 +230,7 @@ test('production exposes restart but no view toggle or authoring request', async
     catch { await route.fulfill({ status: 404 }); }
   });
   await page.goto('/?mode=dev');
-  await expect(page.getByRole('button', { name: 'Hold to restart story' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Gedrückt halten, um die Geschichte neu zu starten' })).toBeVisible();
   await expect(page.locator('.story-view-toggle')).toHaveCount(0);
   expect(devRequests).toEqual([]);
   await context.close();

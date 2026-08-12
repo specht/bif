@@ -1402,15 +1402,15 @@ function createStoryControls(mode) {
     restartHoldControl?.destroy();
     playAgainHoldControl?.destroy();
     el.storyControls.replaceChildren();
-    restartControl = iconButton({ className: 'story-restart-control hold-confirm-control', label: 'Hold to restart story', icon: 'refresh' });
+    restartControl = iconButton({ className: 'story-restart-control hold-confirm-control', label: 'Gedrückt halten, um die Geschichte neu zu starten', icon: 'refresh' });
     restartHoldControl = createHoldToConfirmControl({
         button: restartControl,
         shouldRequireHold: hasMeaningfulProgress,
         onConfirm: restartStory,
         labels: {
-            idle: 'Hold to restart story',
-            holding: 'Release to cancel restart',
-            confirming: 'Restarting story',
+            idle: 'Gedrückt halten, um die Geschichte neu zu starten',
+            holding: 'Loslassen, um den Neustart abzubrechen',
+            confirming: 'Geschichte wird neu gestartet',
         },
     });
     el.storyControls.append(restartControl);
@@ -1431,14 +1431,14 @@ function createStoryControls(mode) {
     const playAgain = document.createElement('button');
     playAgain.type = 'button';
     playAgain.className = 'story-play-again hold-confirm-control';
-    playAgain.textContent = 'Hold to play again';
+    playAgain.textContent = 'Gedrückt halten, um erneut zu spielen';
     playAgainHoldControl = createHoldToConfirmControl({
         button: playAgain,
         onConfirm: restartStory,
         labels: {
-            idle: 'Hold to play again',
-            holding: 'Release to cancel play again',
-            confirming: 'Restarting story',
+            idle: 'Gedrückt halten, um erneut zu spielen',
+            holding: 'Loslassen, um den Neustart abzubrechen',
+            confirming: 'Geschichte wird neu gestartet',
         },
     });
     el.endingActions.replaceChildren(playAgain);

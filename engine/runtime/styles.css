@@ -451,7 +451,7 @@ body.dev .story-controls {
 }
 
 .hold-confirm-control {
-    --hold-progress: 0turn;
+    --hold-progress: 0;
     position: relative;
     isolation: isolate;
     overflow: hidden;
@@ -460,24 +460,20 @@ body.dev .story-controls {
 .hold-confirm-control::after {
     content: '';
     position: absolute;
-    inset: 0.12rem;
-    z-index: -1;
-    border-radius: inherit;
-    background: conic-gradient(var(--fg-color) var(--hold-progress), transparent 0);
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 0.16rem;
+    z-index: 1;
+    background: currentColor;
     opacity: 0;
-    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 0.16rem), #000 0);
-    mask: radial-gradient(farthest-side, transparent calc(100% - 0.16rem), #000 0);
+    pointer-events: none;
+    transform: scaleX(var(--hold-progress));
+    transform-origin: left center;
 }
 
 .hold-confirm-control.is-holding::after,
-.hold-confirm-control.is-confirming::after { opacity: 0.8; }
-
-@media (prefers-reduced-motion: reduce) {
-    .hold-confirm-control.is-holding::after {
-        background: none;
-        border: 0.16rem solid var(--fg-color);
-    }
-}
+.hold-confirm-control.is-confirming::after { opacity: 0.7; }
 
 .story-icon-button:hover {
     border-color: var(--mix-70);

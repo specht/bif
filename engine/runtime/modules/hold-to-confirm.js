@@ -24,7 +24,7 @@ export function createHoldToConfirmControl({
     }
 
     function setProgress(value) {
-        button.style.setProperty('--hold-progress', `${Math.max(0, Math.min(1, value))}turn`);
+        button.style.setProperty('--hold-progress', `${Math.max(0, Math.min(1, value))}`);
     }
 
     function reset() {
