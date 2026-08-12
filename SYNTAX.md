@@ -20,6 +20,14 @@ Rain stripes the compartment window.
 
 Headings, lists, emphasis, quotations, and inline HTML are supported.
 
+In story prose, type ordinary straight quotation marks. BIF renders them with German typography:
+
+```markdown
+> "Die Tür ist abgeschlossen."
+```
+
+renders as `„Die Tür ist abgeschlossen.“`. Single straight quotes are rendered as `‚…‘`. Code spans and script contents are not typographically changed.
+
 ## 3. Page choices
 
 An internal link whose target is a page ID becomes a choice:

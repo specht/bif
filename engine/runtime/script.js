@@ -16,7 +16,11 @@ const config = await import(new URL(`../../config.js?v=${ts}`, import.meta.url))
 const { path } = config;
 const storyBaseUrl = new URL(`${path.replace(/^\.\//, '').replace(/\/$/, '')}/`, document.baseURI);
 
-const md = markdownit({ html: true, typographer: true }).use(markdownitAttrs);
+const md = markdownit({
+    html: true,
+    typographer: true,
+    quotes: '„“‚‘',
+}).use(markdownitAttrs);
 
 const lz = {
     compress: LZString.compressToEncodedURIComponent,

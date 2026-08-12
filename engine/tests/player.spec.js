@@ -29,6 +29,16 @@ test('game mode plays without analysis or authoring modules', async ({ page }) =
   expect(devRequests).toEqual([]);
 });
 
+test('straight quotes in story prose render as German typographic quotes', async ({ page }) => {
+  await useFixture(page, 'engine/test-fixtures/player-basic/pages');
+  await page.route(/\/engine\/test-fixtures\/player-basic\/pages\/1\.md(?:\?.*)?$/, route => route.fulfill({
+    contentType: 'text/markdown',
+    body: '# Start\n\n> "Der ist abgeschlossen."\n',
+  }));
+  await page.goto('/?mode=game');
+  await expect(page.locator('blockquote')).toHaveText('„Der ist abgeschlossen.“');
+});
+
 test('session hash contains only the current versioned JSON schema', async ({ page }) => {
   await useFixture(page, 'engine/test-fixtures/player-basic/pages');
   await page.goto('/?mode=game');
