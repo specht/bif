@@ -5,6 +5,7 @@ const { analyzeStory } = require('../../tools/lib/story-analyzer');
 const { buildAuthoringGraph } = require('../../tools/lib/authoring-graph-model');
 
 const fixture = path.resolve(__dirname, '../../test-fixtures/authoring-graph/complete-project');
+const unreachableFixture = path.resolve(__dirname, '../../test-fixtures/analyzer/unreachable');
 
 test('browser graph model retains pages, groups, diagnostics, and stable identities', async () => {
   const analysis = await analyzeStory(fixture);
@@ -18,4 +19,16 @@ test('browser graph model retains pages, groups, diagnostics, and stable identit
   const parallel = first.edges.filter(edge => edge.source === '1' && edge.target === '2');
   assert.equal(parallel.length, 2);
   assert.notEqual(parallel[0].edgeId, parallel[1].edgeId);
+});
+
+test('browser graph model groups unreachable pages separately', async () => {
+  const graph = buildAuthoringGraph(await analyzeStory(unreachableFixture));
+  const unreachable = graph.groups.find(group => group.groupId === 'cluster-unreachable');
+
+  assert.ok(unreachable);
+  assert.equal(unreachable.name, 'Unreachable pages');
+  assert.deepEqual(
+    unreachable.nodeIds,
+    graph.nodes.filter(node => node.kind === 'page' && !node.reachable).map(node => node.nodeId),
+  );
 });

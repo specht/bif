@@ -90,9 +90,28 @@ function buildAuthoringGraph(analysis) {
     };
   });
 
-  const groups = [...new Set(nodes.filter((node) => node.kind === "page" && node.group).map((node) => node.group))]
+  // Keep disconnected pages visibly separate from the playable story.
+  // Authored group metadata stays on the node, so once the page becomes
+  // reachable it automatically returns to its normal group.
+  const reachablePages = nodes.filter((node) => node.kind === "page" && node.reachable);
+  const unreachablePages = nodes.filter((node) => node.kind === "page" && !node.reachable);
+
+  const groups = [...new Set(reachablePages.filter((node) => node.group).map((node) => node.group))]
     .sort(collator.compare)
-    .map((name) => ({ groupId: `cluster-${token(name)}`, name, nodeIds: nodes.filter((node) => node.kind === "page" && node.group === name).map((node) => node.nodeId) }));
+    .map((name) => ({
+      groupId: `cluster-${token(name)}`,
+      name,
+      nodeIds: reachablePages.filter((node) => node.group === name).map((node) => node.nodeId),
+    }));
+
+  if (unreachablePages.length) {
+    groups.push({
+      groupId: "cluster-unreachable",
+      name: "Unreachable pages",
+      nodeIds: unreachablePages.map((node) => node.nodeId),
+    });
+  }
+
   if (missingTargets.length) groups.push({ groupId: "cluster-missing", name: "Missing targets", nodeIds: nodes.filter((node) => node.kind === "missing").map((node) => node.nodeId) });
 
   const attached = new Set(nodes.flatMap((node) => node.diagnostics).concat(edges.flatMap((edge) => edge.diagnostics)));
