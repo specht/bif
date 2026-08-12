@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Interaktives Abenteuer</title>
+        <script src="engine/runtime/vendor/js-yaml.min.js"></script>
+        <script src="engine/runtime/vendor/lz-string.min.js"></script>
+        <script src="engine/runtime/modules/story-metadata.js"></script>
+
+        <script>
+            const ts = Date.now();
+            const style = document.createElement('link');
+            style.rel = 'stylesheet';
+            style.href = `engine/runtime/styles.css?v=${ts}`;
+            document.head.appendChild(style);
+        </script>
+
+        <link rel="stylesheet" href="engine/runtime/fonts/fonts.css">
+    </head>
+    <body>
+        <div id="resizable-children">
+            <div id="dev_pane">
+                <div id="dev_fixed">
+                    <div id="graph-container"></div>
+                    <div id="divider"></div>
+                    <div id="state-container"></div>
+                </div>
+            </div>
+            <section id="game_pane">
+                <div class="story-controls-layer">
+                    <div class="story-controls" aria-label="Story controls"></div>
+                </div>
+                <main id="content">
+                </main>
+                <div class="story-ending-actions" hidden></div>
+                <div id="story-status" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+            </section>
+        </div>
+        <script type="module">
+            function renderFatalApplicationFailure() {
+                const failure = document.createElement('main');
+                failure.id = 'fatal-application-error';
+                failure.setAttribute('role', 'alert');
+                failure.textContent = 'The story application could not be started.';
+                document.body.replaceChildren(failure);
+            }
+            import(`./engine/runtime/script.js?v=${ts}`)
+                .then(mod => mod.init())
+                .catch(error => {
+                    console.error('Could not initialize story application:', error);
+                    renderFatalApplicationFailure();
+                });
+        </script>
+    </body>
+</html>

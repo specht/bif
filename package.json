@@ -1,0 +1,25 @@
+{
+  "name": "interactive-fiction-player",
+  "displayName": "BIF Authoring Tools",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "npm run test:analyzer && npm run test:publication && npm run test:graph && npm run test:browser",
+    "test:analyzer": "node --test \"engine/tests/analyzer/*.test.js\"",
+    "test:publication": "node --test \"engine/tests/analysis-publication/*.test.js\"",
+    "test:graph": "node --test \"engine/tests/authoring-graph/*.test.js\"",
+    "test:browser": "playwright test --config engine/playwright.config.js",
+    "test:headed": "playwright test --config engine/playwright.config.js --headed",
+    "dev": "node engine/tools/publish-analysis.js --watch",
+    "check": "node engine/tools/check-story.js",
+    "generate-icons": "node engine/tools/generate-icon-sprite.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.1",
+    "@tabler/icons": "3.34.1",
+    "acorn": "^8.17.0",
+    "chokidar": "^4.0.3",
+    "markdown-it": "^14.3.0",
+    "markdown-it-attrs": "^5.0.0"
+  }
+}

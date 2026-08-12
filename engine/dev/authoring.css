@@ -1,0 +1,8 @@
+body.dev #game_pane .story-controls-layer {
+    top: 0.25rem;
+}
+
+#project-analysis-status.analysis-stale {
+    border-inline-start: 0.3rem solid #b66a00;
+    padding-inline-start: 0.6rem;
+}

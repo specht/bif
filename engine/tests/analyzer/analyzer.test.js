@@ -1,0 +1,199 @@
+const assert = require("node:assert/strict");
+const { spawnSync } = require("node:child_process");
+const path = require("node:path");
+const os = require("node:os");
+const fs = require("node:fs/promises");
+const { test } = require("node:test");
+const acorn = require("acorn");
+const { analyzeStory } = require("../../tools/lib/story-analyzer");
+const { normalizeAcornError } = require("../../tools/lib/javascript-checker");
+
+const repository = path.resolve(__dirname, "../..");
+const fixture = (name) => path.join(repository, "test-fixtures/analyzer", name);
+
+test("valid story produces a stable graph with distinct repeated edges", async () => {
+  const result = await analyzeStory(fixture("valid"));
+  assert.equal(result.project.title, "Analyzer start");
+  assert.equal(result.summary.errors, 0);
+  assert.equal(result.summary.pages, 2);
+  assert.equal(result.summary.links, 2);
+  assert.equal(result.summary.reachablePages, 2);
+  assert.equal(result.summary.scripts, 1);
+  assert.equal(result.summary.conditions, 2);
+  assert.equal(result.summary.expressions, 2);
+  assert.deepEqual(result.graph.edges.map(({ source, target, text, label, condition }) => ({ source, target, text, label, condition })), [
+    { source: "1", target: "2", text: "First route", label: "first", condition: "ready" },
+    { source: "1", target: "2", text: "Second route", label: "second", condition: null },
+  ]);
+});
+
+test("missing destinations and unreachable pages are diagnosed", async () => {
+  const missing = await analyzeStory(fixture("missing-link"));
+  const missingPage = missing.diagnostics.find((item) => item.code === "missing-page");
+  assert.equal(missingPage?.target, "99");
+  assert.equal(missingPage?.file, "pages/1.md");
+  assert.ok(missingPage?.line > 0);
+  const unreachable = await analyzeStory(fixture("unreachable"));
+  assert.deepEqual(unreachable.graph.pages.map((page) => page.id), ["1", "2"]);
+  assert.equal(unreachable.diagnostics.find((item) => item.code === "unreachable-page")?.file, "pages/2.md");
+  const strict = await analyzeStory(fixture("unreachable"), { strict: true });
+  assert.equal(strict.diagnostics.find((item) => item.code === "unreachable-page")?.severity, "warning");
+});
+
+test("a missing configured story directory points to its config.js literal", async () => {
+  const result = await analyzeStory(fixture("missing-pages-path"));
+  const item = result.diagnostics.find((diagnostic) => diagnostic.code === "pages-path-missing");
+  assert.deepEqual(item, {
+    severity: "error",
+    code: "pages-path-missing",
+    file: "config.js",
+    line: 1,
+    column: 21,
+    endLine: 1,
+    endColumn: 46,
+    message: "Configured story directory does not exist: pages-that-do-not-exist",
+  });
+  assert.equal(result.summary.errors, 1);
+  assert.equal(result.summary.pages, 0);
+});
+
+test("real JavaScript parsing reports scripts, conditions, and expressions independently", async () => {
+  const result = await analyzeStory(fixture("invalid-syntax"));
+  const codes = result.diagnostics.map((item) => item.code);
+  assert.ok(codes.includes("script-syntax"));
+  assert.equal(codes.filter((code) => code === "script-syntax").length, 1);
+  const script = result.diagnostics.find((item) => item.code === "script-syntax");
+  assert.equal(script.message, "Unexpected token");
+  assert.equal(script.scriptIndex, 1);
+  assert.equal(script.scriptLine, 2);
+  assert.ok(Number.isInteger(script.scriptColumn));
+  assert.ok(Number.isInteger(script.line));
+  assert.ok(Number.isInteger(script.column));
+  assert.ok(codes.includes("condition-syntax"));
+  assert.equal(codes.filter((code) => code === "expression-syntax").length, 2);
+  for (const item of result.diagnostics) {
+    assert.equal(item.file, "pages/1.md");
+    assert.ok(item.line > 0);
+  }
+});
+
+test("Acorn normalization removes only its own parser-location suffix", () => {
+  assert.deepEqual(normalizeAcornError({ message: "Unexpected token (2:20)", loc: { line: 2, column: 20 } }), {
+    message: "Unexpected token", line: 2, column: 20,
+  });
+  assert.deepEqual(normalizeAcornError({ message: "Expected token (because grouped)", loc: { line: 2, column: 20 } }), {
+    message: "Expected token (because grouped)", line: 2, column: 20,
+  });
+});
+
+test("Assigning to rvalue publishes a semantic message and structured local coordinates", async () => {
+  const result = await analyzeStory(fixture("assigning-rvalue"));
+  const item = result.diagnostics.find(diagnostic => diagnostic.code === "script-syntax");
+  assert.equal(item.message, "Assigning to rvalue");
+  assert.equal(item.file, "pages/1.md");
+  assert.equal(item.line, 16);
+  assert.equal(item.column, 22);
+  assert.equal(item.scriptIndex, 1);
+  assert.equal(item.scriptLine, 2);
+  assert.equal(item.scriptColumn, 21);
+  assert.doesNotMatch(item.message, /Script 1|\(2:21\)/);
+});
+
+test("bork parser failure retains raw Acorn location but publishes only its semantic message", async () => {
+  const source = "\n    crew_count -= 2;\n    bork bork bork\n";
+  assert.throws(() => acorn.parse(source, { ecmaVersion: "latest", locations: true }), error => {
+    assert.match(error.message, /Unexpected token \(3:9\)$/);
+    return true;
+  });
+  const result = await analyzeStory(fixture("bork-script-page4"));
+  const item = result.diagnostics.find(diagnostic => diagnostic.code === "script-syntax");
+  assert.equal(item.message, "Unexpected token");
+  assert.equal(item.file, "pages/4.md");
+  assert.equal(item.line, 21);
+  assert.equal(item.scriptIndex, 1);
+  assert.equal(item.scriptLine, 3);
+  assert.equal(item.scriptColumn, 9);
+  assert.doesNotMatch(item.message, /Script 1|\(3:9\)/);
+});
+
+test("local image existence, traversal, and missing alt text are checked", async () => {
+  const result = await analyzeStory(fixture("missing-image"));
+  assert.ok(result.diagnostics.some((item) => item.code === "missing-image" && item.message.includes("assets/missing.png")));
+  assert.ok(result.diagnostics.some((item) => item.code === "asset-outside-story"));
+  assert.ok(result.diagnostics.some((item) => item.code === "missing-image-alt"));
+  assert.ok(!result.diagnostics.some((item) => item.message.includes("example.test")));
+});
+
+test("case-insensitive page ID collisions are diagnosed", async () => {
+  const result = await analyzeStory(fixture("collision"));
+  assert.ok(result.diagnostics.some((item) => item.code === "case-collision"));
+  assert.ok(result.diagnostics.some((item) => item.code === "ambiguous-target"));
+});
+
+test("a fixture story can be analyzed without executing story code", async () => {
+  const result = await analyzeStory(fixture("valid"));
+  assert.equal(result.summary.pages, 2);
+  assert.equal(result.summary.errors, 0);
+});
+
+test("CLI JSON is machine-readable and failures set a nonzero exit status", () => {
+  const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
+  const valid = spawnSync(process.execPath, ["tools/check-story.js", "--project", fixture("valid"), "--json"], { cwd: repository, encoding: "utf8", env });
+  assert.ifError(valid.error);
+  assert.equal(valid.status, 0, valid.stderr);
+  const parsed = JSON.parse(valid.stdout);
+  assert.equal(parsed.version, 1);
+  assert.equal(parsed.summary.pages, 2);
+  const invalid = spawnSync(process.execPath, ["tools/check-story.js", "--project", fixture("missing-link"), "--json"], { cwd: repository, encoding: "utf8", env });
+  assert.ifError(invalid.error);
+  assert.equal(invalid.status, 1);
+  assert.equal(JSON.parse(invalid.stdout).diagnostics[0].code, "missing-page");
+  const warning = spawnSync(process.execPath, ["tools/check-story.js", "--project", fixture("unreachable")], { cwd: repository, encoding: "utf8", env });
+  const strict = spawnSync(process.execPath, ["tools/check-story.js", "--project", fixture("unreachable"), "--strict"], { cwd: repository, encoding: "utf8", env });
+  assert.equal(warning.status, 0);
+  assert.equal(strict.status, 1);
+});
+
+test("analysis output is deterministic", async () => {
+  const first = await analyzeStory(fixture("valid"));
+  const second = await analyzeStory(fixture("valid"));
+  assert.equal(JSON.stringify(first), JSON.stringify(second));
+});
+
+test("raw HTML media and story-local assets are included in the input manifest", async () => {
+  const project = await fs.mkdtemp(path.join(os.tmpdir(), "bif-media-"));
+  try {
+    await fs.mkdir(path.join(project, "story", "media"), { recursive: true });
+    await fs.writeFile(path.join(project, "config.js"), "export const path = 'story';\n");
+    await fs.writeFile(path.join(project, "story", "1.md"), "# Media\n\n<audio src=\"media/theme.ogg\"></audio>\n<video><source src=\"media/clip.mp4\"></video>\n");
+    await fs.writeFile(path.join(project, "story", "media", "theme.ogg"), "audio");
+    await fs.writeFile(path.join(project, "story", "media", "clip.mp4"), "video");
+    const result = await analyzeStory(project);
+    assert.equal(result.summary.errors, 0);
+    assert.deepEqual(result.inputManifest.map(item => item.path), [
+      "config.js", "story/1.md", "story/media/clip.mp4", "story/media/theme.ogg",
+    ]);
+  } finally {
+    await fs.rm(project, { recursive: true });
+  }
+});
+
+test("the same relative asset name resolves independently in two story folders", async () => {
+  const project = await fs.mkdtemp(path.join(os.tmpdir(), "bif-stories-"));
+  try {
+    for (const story of ["story-a", "story-b"]) {
+      await fs.mkdir(path.join(project, story, "images"), { recursive: true });
+      await fs.writeFile(path.join(project, story, "1.md"), `# ${story}\n\n![Map](images/map.png)\n`);
+      await fs.writeFile(path.join(project, story, "images", "map.png"), story);
+    }
+    await fs.writeFile(path.join(project, "config.js"), "export const path = 'story-a';\n");
+    const first = await analyzeStory(project);
+    await fs.writeFile(path.join(project, "config.js"), "export const path = 'story-b';\n");
+    const second = await analyzeStory(project);
+    assert.ok(first.inputManifest.some(item => item.path === "story-a/images/map.png"));
+    assert.ok(second.inputManifest.some(item => item.path === "story-b/images/map.png"));
+  } finally {
+    await fs.rm(project, { recursive: true });
+  }
+});

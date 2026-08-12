@@ -1,0 +1,125 @@
+const CONTEXT_LINES = 2;
+
+export function safeSourcePath(file) {
+    if (typeof file !== 'string' || !file || file.startsWith('/') || file.startsWith('\\') || /^[a-z]:[\\/]/i.test(file) || /^[a-z][a-z\d+.-]*:/i.test(file)) return null;
+    let decoded;
+    try { decoded = decodeURIComponent(file); } catch { return null; }
+    if (decoded.startsWith('//') || decoded.split(/[\\/]/).some(part => part === '..' || part === '')) return null;
+    return decoded.split('/').map(encodeURIComponent).join('/');
+}
+
+function expandTabs(value, tabSize = 4) {
+    let column = 0;
+    let result = '';
+    for (const character of value) {
+        if (character === '\t') {
+            const spaces = tabSize - (column % tabSize);
+            result += ' '.repeat(spaces);
+            column += spaces;
+        } else {
+            result += character;
+            column += 1;
+        }
+    }
+    return result;
+}
+
+export function buildSourceSnippet(source, diagnostic, contextLines = CONTEXT_LINES) {
+    const sourceLines = String(source).replace(/\r\n?/g, '\n').split('\n');
+    const requestedLine = Number.isInteger(diagnostic.line) ? diagnostic.line : 1;
+    const stale = requestedLine < 1 || requestedLine > sourceLines.length;
+    const diagnosticLine = Math.min(Math.max(requestedLine, 1), Math.max(sourceLines.length, 1));
+    let startLine = Math.max(1, diagnosticLine - contextLines);
+    let endLine = Math.min(sourceLines.length, diagnosticLine + contextLines);
+    while (startLine < diagnosticLine && sourceLines[startLine - 1].trim() === '') startLine += 1;
+    while (endLine > diagnosticLine && sourceLines[endLine - 1].trim() === '') endLine -= 1;
+    const columnKnown = Number.isInteger(diagnostic.column) && diagnostic.column > 0;
+    const rangeKnown = columnKnown && Number.isInteger(diagnostic.endColumn) && diagnostic.endColumn > diagnostic.column;
+    const rawColumn = columnKnown ? diagnostic.column : 1;
+    const rawEnd = rangeKnown ? diagnostic.endColumn : rawColumn + 1;
+    const diagnosticSource = sourceLines[diagnosticLine - 1] || '';
+    const visualColumn = expandTabs(diagnosticSource.slice(0, rawColumn - 1)).length + 1;
+    const visualEndColumn = expandTabs(diagnosticSource.slice(0, rawEnd - 1)).length + 1;
+    return {
+        startLine,
+        endLine,
+        diagnosticLine,
+        diagnosticColumn: visualColumn,
+        diagnosticEndColumn: Math.max(visualColumn + 1, visualEndColumn),
+        columnKnown,
+        rangeKnown,
+        stale,
+        lines: sourceLines.slice(startLine - 1, endLine).map(expandTabs),
+    };
+}
+
+function appendToken(parent, text, className) {
+    const span = document.createElement('span');
+    if (className) span.className = className;
+    span.textContent = text;
+    parent.append(span);
+}
+
+export function renderHighlightedSource(parent, text, file) {
+    const markdown = /\.md$/i.test(file);
+    const pattern = markdown
+        ? /(^#{1,6}\s.*$|```[^`]*|`[^`]*`|\[[^\]]*\]\([^)]*\)|\*\*[^*]+\*\*|\/\/.*$|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|\b(?:await|const|let|var|if|else|return|async|function|true|false|null|new|throw|try|catch)\b|\b\d+(?:\.\d+)?\b)/gm
+        : /(\/\/.*$|\/\*[\s\S]*?\*\/|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|\b(?:await|const|let|var|if|else|return|async|function|true|false|null|new|throw|try|catch)\b|\b\d+(?:\.\d+)?\b)/gm;
+    let offset = 0;
+    for (const match of text.matchAll(pattern)) {
+        appendToken(parent, text.slice(offset, match.index));
+        const token = match[0];
+        const className = markdown
+            ? token.startsWith('#') ? 'token-heading'
+                : token.startsWith('`') ? 'token-code'
+                    : token.startsWith('[') ? 'token-link'
+                        : token.startsWith('**') ? 'token-emphasis'
+                            : token.startsWith('//') ? 'token-comment'
+                                : /^['"]/.test(token) ? 'token-string'
+                                    : /^\d/.test(token) ? 'token-number'
+                                        : 'token-keyword'
+            : token.startsWith('//') || token.startsWith('/*') ? 'token-comment' : /^['"]/.test(token) ? 'token-string' : /^\d/.test(token) ? 'token-number' : 'token-keyword';
+        appendToken(parent, token, className);
+        offset = match.index + token.length;
+    }
+    appendToken(parent, text.slice(offset));
+}
+
+export function renderSourceSnippet(model, file) {
+    const container = document.createElement('div');
+    container.className = 'problem-source-snippet';
+    if (model.stale) {
+        const warning = document.createElement('p');
+        warning.className = 'problem-source-note';
+        warning.textContent = 'The reported line is outside the current file; showing the nearest available source.';
+        container.append(warning);
+    }
+    const code = document.createElement('div');
+    code.className = 'problem-source-code';
+    model.lines.forEach((line, index) => {
+        const lineNumber = model.startLine + index;
+        const row = document.createElement('div');
+        row.className = 'problem-source-line';
+        const number = document.createElement('span');
+        number.className = 'problem-source-line-number';
+        number.textContent = String(lineNumber);
+        const source = document.createElement('code');
+        source.className = 'problem-source-text';
+        renderHighlightedSource(source, line, file);
+        if (lineNumber === model.diagnosticLine) {
+            row.classList.add('problem-source-diagnostic-line');
+            const marker = document.createElement('span');
+            marker.className = `problem-source-range ${model.rangeKnown ? 'exact' : model.columnKnown ? 'estimated' : 'whole-line'}`;
+            marker.setAttribute('aria-hidden', 'true');
+            if (model.columnKnown) {
+                marker.style.setProperty('--marker-column', model.diagnosticColumn);
+                marker.style.setProperty('--marker-width', Math.max(1, model.diagnosticEndColumn - model.diagnosticColumn));
+            }
+            source.append(marker);
+        }
+        row.append(number, source);
+        code.append(row);
+    });
+    container.append(code);
+    return container;
+}
