@@ -435,15 +435,15 @@ button {
         0 2px 5px var(--story-shadow-soft);
 }
 
-/* A choice that has already been made is part of the story history, not an
-   active control. Let it read like ordinary prose instead of a disabled button. */
+/* A choice that has already been made remains visible as part of the story
+   history, but should read as inactive rather than as a full button. */
 #game_pane .committed-choice-turn .story-choice,
 #game_pane .committed-choice-turn .story-choice:hover,
 #game_pane .story-choice.committed-choice.chosen {
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
+    padding: 0.45em 0.65em;
+    border: 1px solid var(--mix-85);
+    border-radius: var(--story-choice-radius);
+    background: var(--mix-95);
     background-image: none;
     box-shadow: none;
     line-height: var(--story-line-height);
