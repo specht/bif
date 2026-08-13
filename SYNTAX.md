@@ -25,7 +25,7 @@ font_heading: DM Serif Display
 # Night train
 ```
 
-Available themes are `default`, `paper`, `mystery`, `midnight`, `terminal`, and `playful`. Every theme provides its own default body and heading fonts and a preferred brightness. `default` follows the system; `paper` and `playful` prefer light; `mystery`, `midnight`, and `terminal` prefer dark. Set `brightness: light`, `brightness: dark`, or `brightness: system` to override the theme. `system` follows the reader's operating-system/browser preference. Override either font by entering an exact family name from [Google Fonts](https://fonts.google.com/). BIF authoring downloads non-bundled fonts into the story's generated `bif-assets/` directory so the playable story uses local font files. The `bif-assets/` name is reserved for BIF.
+Available themes are `default`, `paper`, `mystery`, `midnight`, `terminal`, and `playful`. A theme supplies default background, text, and accent colors, default body and heading fonts, a preferred brightness, and a few structural details such as corner radius and spacing. `default` follows the system; `paper` and `playful` prefer light; `mystery`, `midnight`, and `terminal` prefer dark. Set `brightness: light`, `brightness: dark`, or `brightness: system` to override the theme. `system` follows the reader's operating-system/browser preference. Override either font by entering an exact family name from [Google Fonts](https://fonts.google.com/). BIF authoring downloads non-bundled fonts into the story's generated `bif-assets/` directory so the playable story uses local font files. The `bif-assets/` name is reserved for BIF.
 
 The supported front-matter settings are:
 
@@ -38,7 +38,7 @@ The supported front-matter settings are:
 - `font_body`: body and choice font
 - `font_heading`: heading font
 
-`accent` changes links and related reader highlights. `background` replaces the theme's base background, and `text` replaces the theme's normal foreground and heading color. BIF derives surfaces, borders, and muted colors from the resulting background/text pair. If `background` is given without `text`, BIF chooses a high-contrast text color automatically. If both custom colors are present but have less than 4.5:1 contrast, authoring reports a warning while preserving the colors exactly as written.
+`background`, `text`, and `accent` are the reader's three base colors. `text` controls normal text and headings; `accent` controls links, focus highlights, and interactive choice states. BIF derives surfaces, borders, muted colors, and other decorative shades from those base colors rather than storing a separate fixed palette for every theme. This means changing a theme's colors changes the whole reader coherently. If `background` is given without `text`, BIF chooses a high-contrast text color automatically. If both custom colors are present but have less than 4.5:1 contrast, authoring reports a warning while preserving the colors exactly as written.
 
 Write ordinary Markdown after the front matter. The title comes from `title` metadata or the first H1 in `1.md`:
 

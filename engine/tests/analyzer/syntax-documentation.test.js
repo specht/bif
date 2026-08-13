@@ -54,3 +54,18 @@ test('documented story themes exist in the reader stylesheet', () => {
   assert.match(manual, /`text`/);
   assert.match(styles, /--story-accent-color/);
 });
+
+test('reader secondary palette is derived from background, text, and accent base colors', () => {
+  assert.match(styles, /--bg-color:\s*var\(--story-background\)/);
+  assert.match(styles, /--fg-color:\s*var\(--story-text\)/);
+  assert.match(styles, /--story-heading-color:\s*var\(--story-text\)/);
+  assert.match(styles, /--story-accent-color:\s*var\(--story-accent\)/);
+  for (const property of ['surface-1', 'surface-2', 'surface-3', 'border-color', 'border-strong', 'muted-color']) {
+    assert.match(styles, new RegExp(`--${property}:\\s*color-mix\\(in oklab, var\\(--story-background\\).*var\\(--story-text\\)`, 's'));
+  }
+  const terminalLight = styles.match(/html\[data-story-theme="terminal"\][\s\S]*?\n}/)?.[0] || '';
+  assert.match(terminalLight, /--story-background:/);
+  assert.match(terminalLight, /--story-text:/);
+  assert.match(terminalLight, /--story-accent:/);
+  assert.doesNotMatch(terminalLight, /--surface-|--border-color|--muted-color/);
+});

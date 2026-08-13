@@ -971,34 +971,18 @@ function contrastRatio(left, right) {
     return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
-function customStoryPalette(background, text) {
+function customStoryBaseColors(background, text) {
     const bg = hexColor(background);
     const explicitText = hexColor(text);
-    if (!bg && !explicitText) return null;
+    let resolvedText = explicitText;
 
-    const darkInk = '#181818';
-    const lightInk = '#f7f7f7';
-    const fg = explicitText || (contrastRatio(bg, darkInk) >= contrastRatio(bg, lightInk) ? darkInk : lightInk);
-    const properties = {
-        '--fg-color': fg,
-        '--surface-1': 'color-mix(in srgb, var(--bg-color) 94%, var(--fg-color))',
-        '--surface-2': 'color-mix(in srgb, var(--bg-color) 89%, var(--fg-color))',
-        '--surface-3': 'color-mix(in srgb, var(--bg-color) 83%, var(--fg-color))',
-        '--border-color': 'color-mix(in srgb, var(--bg-color) 70%, var(--fg-color))',
-        '--border-strong': 'color-mix(in srgb, var(--bg-color) 55%, var(--fg-color))',
-        '--muted-color': 'color-mix(in srgb, var(--bg-color) 42%, var(--fg-color))',
-        '--story-heading-color': 'var(--fg-color)',
-    };
-
-    let colorScheme = null;
-    if (bg) {
-        properties['--bg-color'] = bg;
-        const dark = relativeLuminance(bg) < 0.4;
-        properties['--shadow-color'] = dark ? 'rgba(0, 0, 0, 0.65)' : 'rgba(0, 0, 0, 0.18)';
-        colorScheme = dark ? 'dark' : 'light';
+    if (bg && !resolvedText) {
+        const darkInk = '#181818';
+        const lightInk = '#f7f7f7';
+        resolvedText = contrastRatio(bg, darkInk) >= contrastRatio(bg, lightInk) ? darkInk : lightInk;
     }
 
-    return { colorScheme, properties };
+    return { background: bg, text: resolvedText };
 }
 
 function setOptionalStyleProperty(style, name, value) {
@@ -1008,19 +992,13 @@ function setOptionalStyleProperty(style, name, value) {
 
 function applyCustomStoryColors(effective) {
     const targets = devMode ? [el.gamePane.style] : [el.body.style, el.gamePane.style];
-    const palette = customStoryPalette(effective.background, effective.text);
-    const paletteProperties = [
-        '--bg-color', '--fg-color', '--surface-1', '--surface-2', '--surface-3',
-        '--border-color', '--border-strong', '--muted-color', '--shadow-color', '--story-heading-color',
-    ];
+    const custom = customStoryBaseColors(effective.background, effective.text);
     for (const style of targets) {
-        setOptionalStyleProperty(style, '--story-accent-color', hexColor(effective.accent));
-        for (const name of paletteProperties) style.removeProperty(name);
+        setOptionalStyleProperty(style, '--story-background', custom.background);
+        setOptionalStyleProperty(style, '--story-text', custom.text);
+        setOptionalStyleProperty(style, '--story-accent', hexColor(effective.accent));
         style.removeProperty('color-scheme');
-        if (palette) {
-            for (const [name, value] of Object.entries(palette.properties)) style.setProperty(name, value);
-            if (palette.colorScheme) style.colorScheme = palette.colorScheme;
-        }
+        if (custom.background) style.colorScheme = relativeLuminance(custom.background) < 0.4 ? 'dark' : 'light';
     }
 }
 

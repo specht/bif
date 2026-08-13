@@ -214,3 +214,44 @@ test('Google font metadata makes the reader request only the story-local generat
   await expect.poll(() => requests.some(url => url.includes('/pages/bif-assets/fonts.css'))).toBe(true);
   expect(requests.some(url => url.includes('fonts.googleapis.com') || url.includes('fonts.gstatic.com'))).toBe(false);
 });
+
+test('custom base colors recolor terminal surfaces and borders instead of leaving theme greens behind', async ({ page }) => {
+  await useFixture(page, 'engine/test-fixtures/player-basic/pages');
+  await page.route(/\/engine\/test-fixtures\/player-basic\/pages\/1\.md(?:\?.*)?$/, route => route.fulfill({
+    contentType: 'text/markdown',
+    body: '---\ntheme: terminal\nbackground: "#050905"\ntext: "#ff0066"\naccent: "#ff4d9d"\n---\n# Start\n\nPink terminal.\n',
+  }));
+  await page.goto('/?mode=game');
+  await expect(page.getByRole('heading', { name: 'Start' })).toBeVisible();
+  const colors = await page.evaluate(() => {
+    const pane = document.getElementById('game_pane');
+    const probe = document.createElement('span');
+    pane.appendChild(probe);
+
+    probe.style.color = 'color-mix(in oklab, #050905 94%, #ff0066)';
+    const expectedSurface = getComputedStyle(probe).color;
+    probe.style.color = 'color-mix(in oklab, #050905 70%, #ff0066)';
+    const expectedBorder = getComputedStyle(probe).color;
+
+    probe.style.color = '';
+    probe.style.border = '1px solid var(--border-color)';
+    const derivedBorder = getComputedStyle(probe).borderColor;
+    probe.remove();
+
+    const paneStyle = getComputedStyle(pane);
+    return {
+      background: paneStyle.backgroundColor,
+      text: paneStyle.color,
+      accent: paneStyle.getPropertyValue('--story-accent-color').trim(),
+      controlSurface: getComputedStyle(document.querySelector('.story-icon-button')).backgroundColor,
+      derivedBorder,
+      expectedSurface,
+      expectedBorder,
+    };
+  });
+  expect(colors.background).toBe('rgb(5, 9, 5)');
+  expect(colors.text).toBe('rgb(255, 0, 102)');
+  expect(colors.accent).toBe('#ff4d9d');
+  expect(colors.controlSurface).toBe(colors.expectedSurface);
+  expect(colors.derivedBorder).toBe(colors.expectedBorder);
+});

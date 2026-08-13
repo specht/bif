@@ -83,7 +83,7 @@ font_heading: Special Elite
 Du willst gerade gehen ...
 ```
 
-Built-in themes are `default`, `paper`, `mystery`, `midnight`, `terminal`, and `playful`. Each theme already has a matching heading/body font pair and a preferred brightness, so `theme:` can be used by itself. `font_body:` and `font_heading:` override either font independently.
+Built-in themes are `default`, `paper`, `mystery`, `midnight`, `terminal`, and `playful`. A theme supplies default background, text, and accent colors together with a matching heading/body font pair, a preferred brightness, and a few structural details such as corner radius and spacing. `theme:` can therefore be used by itself. `font_body:` and `font_heading:` override either font independently.
 
 | Theme | Body | Headings | Brightness |
 | --- | --- | --- | --- |
@@ -116,7 +116,7 @@ text: "#ffb347"
 ---
 ```
 
-`accent:` changes links, focus highlights, and choice accents. `background:` changes the reader's base background, and `text:` changes the normal text and heading color. All three accept six-digit hex colors (`#RRGGBB`). BIF derives surfaces, borders, and muted colors from the chosen background/text pair instead of exposing every palette detail separately. If `background:` is set without `text:`, BIF automatically chooses a high-contrast text color. If both are set and their contrast is low, the Problems view warns about it rather than silently changing the student's colors.
+`background:`, `text:`, and `accent:` are the three base colors of the reader. `text:` also controls headings; `accent:` is used for links, focus highlights, and interactive choice states. All three accept six-digit hex colors (`#RRGGBB`). BIF derives surfaces, borders, muted colors, and other decorative shades from these base colors, so changing a Terminal story from green to pink also changes the surrounding UI instead of leaving green theme colors behind. If `background:` is set without `text:`, BIF automatically chooses a high-contrast text color. If both are set and their contrast is low, the Problems view warns about it rather than silently changing the student's colors.
 
 To choose another typeface, browse [Google Fonts](https://fonts.google.com/), copy the family name exactly, and put it in `font_body:` or `font_heading:`. While `npm run dev` is running, BIF downloads the required font files into the selected story's generated `bif-assets/` directory and rewrites the Google Fonts stylesheet to use those local files. Readers of the published story therefore do not need to contact Google Fonts.
 
