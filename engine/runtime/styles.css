@@ -440,7 +440,7 @@ button {
 #game_pane .committed-choice-turn .story-choice,
 #game_pane .committed-choice-turn .story-choice:hover,
 #game_pane .story-choice.committed-choice.chosen {
-    padding: 0.3em 0.5em;
+    /* padding: 0.3em 0.5em; */
     border: 1px solid var(--mix-90);
     border-radius: var(--story-choice-radius);
     background: transparent;
