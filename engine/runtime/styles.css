@@ -426,6 +426,7 @@ button {
 }
 
 #game_pane .story-choice,
+#game_pane ul:has(li a) li a,
 #game_pane button.pagelink {
     border: 1px solid var(--border-color);
     border-radius: var(--story-choice-radius);
@@ -438,6 +439,7 @@ button {
 }
 
 #game_pane .story-choice:hover,
+#game_pane ul:has(li a) li a:hover,
 #game_pane button.pagelink:hover {
     background-color: color-mix(in srgb, var(--story-accent-color) 8%, var(--surface-2));
     border-color: color-mix(in srgb, var(--story-accent-color) 38%, var(--border-strong));
