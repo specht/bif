@@ -427,12 +427,20 @@ button {
 
 #game_pane .story-choice,
 #game_pane button.pagelink {
+    border: 1px solid var(--border-color);
     border-radius: var(--story-choice-radius);
+    background-color: var(--surface-1);
     font-family: var(--story-body-font);
     background-image: none;
     box-shadow:
         0 1px 2px var(--story-shadow),
         0 2px 5px var(--story-shadow-soft);
+}
+
+#game_pane .story-choice:hover,
+#game_pane button.pagelink:hover {
+    background-color: color-mix(in srgb, var(--story-accent-color) 8%, var(--surface-2));
+    border-color: color-mix(in srgb, var(--story-accent-color) 38%, var(--border-strong));
 }
 
 /* A choice that has already been made remains visible as part of the story
