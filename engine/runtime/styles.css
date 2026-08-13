@@ -443,6 +443,7 @@ button {
 #game_pane button.pagelink {
     border-radius: var(--story-choice-radius);
     font-family: var(--story-body-font);
+    background-image: none;
     box-shadow:
         0 1px 2px var(--story-shadow),
         0 2px 5px var(--story-shadow-soft);
@@ -1231,11 +1232,11 @@ html[data-story-brightness] body:not(.dev),
 html[data-story-brightness] #game_pane {
     --bg-color: var(--story-background);
     --fg-color: var(--story-text);
-    --surface-1: color-mix(in oklab, var(--story-background) 94%, var(--story-text));
-    --surface-2: color-mix(in oklab, var(--story-background) 89%, var(--story-text));
-    --surface-3: color-mix(in oklab, var(--story-background) 83%, var(--story-text));
-    --border-color: color-mix(in oklab, var(--story-background) 70%, var(--story-text));
-    --border-strong: color-mix(in oklab, var(--story-background) 55%, var(--story-text));
+    --surface-1: color-mix(in oklab, var(--story-background) 97%, var(--story-text));
+    --surface-2: color-mix(in oklab, var(--story-background) 94%, var(--story-text));
+    --surface-3: color-mix(in oklab, var(--story-background) 88%, var(--story-text));
+    --border-color: color-mix(in oklab, var(--story-background) 80%, var(--story-text));
+    --border-strong: color-mix(in oklab, var(--story-background) 65%, var(--story-text));
     --muted-color: color-mix(in oklab, var(--story-background) 42%, var(--story-text));
     --story-shadow: color-mix(in oklab, transparent 78%, var(--fg-color));
     --story-shadow-soft: color-mix(in oklab, transparent 88%, var(--fg-color));
