@@ -245,20 +245,6 @@ button.pagelink {
     pointer-events: none;
 }
 
-.committed-choice-turn .story-choice:hover {
-    background-color: var(--bg-color);
-    border-color: var(--mix-70);
-    box-shadow:
-        0 1px 2px var(--story-shadow),
-        0 2px 5px var(--story-shadow-soft);
-}
-
-.story-choice.committed-choice.chosen {
-    border: 1px solid color-mix(in srgb, var(--story-accent-color) 30%, var(--border-color));
-    border-radius: 4px;
-    background-color: color-mix(in srgb, var(--story-accent-color) 10%, var(--surface-1));
-}
-
 .choice-result {
     margin: 0;
 }
@@ -447,6 +433,20 @@ button {
     box-shadow:
         0 1px 2px var(--story-shadow),
         0 2px 5px var(--story-shadow-soft);
+}
+
+/* A choice that has already been made is part of the story history, not an
+   active control. Let it read like ordinary prose instead of a disabled button. */
+#game_pane .committed-choice-turn .story-choice,
+#game_pane .committed-choice-turn .story-choice:hover,
+#game_pane .story-choice.committed-choice.chosen {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    background-image: none;
+    box-shadow: none;
+    line-height: var(--story-line-height);
 }
 
 .story-controls-layer {
