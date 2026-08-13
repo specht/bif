@@ -1180,14 +1180,15 @@ body.skip-animations {
 
 div.choice {
     display: flex;
-    flex-direction: row;
-    gap: 0.75em;
+    flex-direction: column;
+    gap: var(--choice-gap);
+    margin-block: var(--turn-to-live-set-gap) 0;
 
     .pagelink {
-        text-align: center
+        margin: 0;
+        text-align: left;
     }
 }
-
 
 /* Dark-mode finishing touches */
 body,
