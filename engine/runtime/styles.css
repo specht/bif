@@ -1188,6 +1188,21 @@ div.choice {
         margin: 0;
         text-align: left;
     }
+
+    &.choice-committed {
+        gap: 0;
+    }
+}
+
+/* Dynamic choices use the legacy .pagelink collapse animation. Once a
+   choice has been made, remove rejected buttons completely from the vertical
+   layout instead of leaving their padding and border behind. */
+#game_pane div.choice .pagelink.dismissed {
+    min-height: 0;
+    padding-block: 0;
+    border-width: 0;
+    opacity: 0;
+    box-shadow: none;
 }
 
 /* Dark-mode finishing touches */

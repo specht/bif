@@ -194,7 +194,8 @@ function presentChoice(choices, generation = sessionGeneration, outputParent = p
     nextPageLinks = {};
     for (let i = 0; i < choices.length; i++) {
         let button = document.createElement('button');
-        button.classList.add('pagelink');
+        button.type = 'button';
+        button.classList.add('pagelink', 'story-choice');
         choiceDiv.appendChild(button);
 
         let choice = choices[i];
@@ -1175,6 +1176,9 @@ async function turnToPage(page, generation = sessionGeneration) {
         for (let option of choiceDiv.querySelectorAll('.pagelink')) {
             deactivateChoice(option, option === selectedChoice);
         }
+        selectedChoice.classList.add('committed-choice');
+        selectedChoice.setAttribute('aria-pressed', 'true');
+        choiceDiv.classList.add('choice-committed');
         choiceDiv = null;
         deferred.resolve(`${page}`);
         history.push(page);
