@@ -42,6 +42,7 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
   const pagesDirectory = path.resolve(root, config.pagesPath);
   const pagesPathLocation = config.pagesPathLocation || { line: 1, column: 1 };
   let storyTitle = FALLBACK_TITLE;
+  let storyAppearance = { theme: "default", fontBody: null, fontHeading: null };
   if (!pagesDirectory.startsWith(`${root}${path.sep}`) && pagesDirectory !== root) {
     diagnostics.push(diagnostic("error", "pages-path-outside-project", "config.js", pagesPathLocation.line, pagesPathLocation.column, `Configured story path escapes the project: ${config.pagesPath}`, pagesPathLocation));
     return finish(root, { ...config, title: FALLBACK_TITLE, startPage: "1" }, [], [], diagnostics, 0, sourceEntries, manifestEntries);
@@ -87,8 +88,11 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
     if (id === "1") {
       const metadata = resolveStoryMetadata(source, { sourcePath: file });
       storyTitle = metadata.title;
+      storyAppearance = metadata.appearance;
       source = metadata.bodyMarkdown;
-      for (const message of metadata.warnings) diagnostics.push(diagnostic("warning", "missing-story-title", file, 1, 1, message));
+      for (const item of metadata.issues) {
+        diagnostics.push(diagnostic(item.severity || "warning", item.code || "story-metadata", file, item.line || 1, item.column || 1, item.message));
+      }
     }
     const parsed = parsePage(source, { pageId: id });
     if (parsed.metadata.malformed) diagnostics.push(diagnostic("warning", "malformed-metadata", file, parsed.metadata.line, 1, "Graph metadata comment is malformed."));
@@ -189,7 +193,7 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
     if (!reachable.has(page.id)) diagnostics.push(diagnostic("warning", "unreachable-page", page.file, 1, 1, `Page '${page.id}' is unreachable from page '${startPage}'.`));
   }
 
-  return finish(root, { ...config, title: storyTitle, startPage }, pages, edges, diagnostics, reachable.size, sourceEntries, manifestEntries);
+  return finish(root, { ...config, title: storyTitle, startPage, appearance: storyAppearance }, pages, edges, diagnostics, reachable.size, sourceEntries, manifestEntries);
 }
 
 function hashBytes(bytes) {
@@ -210,7 +214,7 @@ function finish(root, project, pages, edges, diagnostics, reachablePages = 0, so
     version: 1,
     contentHash: crypto.createHash("sha256").update(JSON.stringify(sourceEntries)).digest("hex"),
     inputManifest: [...manifestEntries].sort(([a], [b]) => a.localeCompare(b)).map(([file, sha256]) => ({ path: file, sha256 })),
-    project: { root: ".", title: project.title, pagesPath: project.pagesPath, startPage: project.startPage },
+    project: { root: ".", title: project.title, pagesPath: project.pagesPath, startPage: project.startPage, appearance: project.appearance || { theme: "default", fontBody: null, fontHeading: null } },
     summary: {
       pages: pages.length,
       reachablePages,

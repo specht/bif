@@ -931,10 +931,43 @@ async function loadPage(page) {
     return resolvePageMetadata(page, await response.text());
 }
 
+function cssFontStack(family, generic) {
+    const escaped = String(family).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    return `"${escaped}", ${generic}`;
+}
+
+function ensureStoryFontStylesheet(families) {
+    const id = 'bif-story-fonts';
+    let link = document.getElementById(id);
+    if (!families.length) {
+        link?.remove();
+        return;
+    }
+    if (!link) {
+        link = document.createElement('link');
+        link.id = id;
+        link.rel = 'stylesheet';
+        document.head.appendChild(link);
+    }
+    const fontUrl = new URL('bif-assets/fonts.css', storyBaseUrl);
+    fontUrl.searchParams.set('v', cache_buster);
+    link.href = fontUrl.toString();
+}
+
+function applyStoryAppearance(metadata) {
+    const appearance = metadata.appearance || { theme: 'default' };
+    const effective = metadata.effectiveAppearance || BifStoryMetadata.effectiveAppearance(appearance);
+    document.documentElement.dataset.storyTheme = effective.theme;
+    el.gamePane.style.setProperty('--story-body-font', cssFontStack(effective.fontBody, effective.generic));
+    el.gamePane.style.setProperty('--story-heading-font', cssFontStack(effective.fontHeading, effective.generic));
+    ensureStoryFontStylesheet(BifStoryMetadata.googleFontFamilies(appearance));
+}
+
 function resolvePageMetadata(page, source) {
     if (`${page}` !== '1') return source;
     const metadata = BifStoryMetadata.resolveStoryMetadata(source, { sourcePath: `${path}/1.md` });
     document.title = metadata.title;
+    applyStoryAppearance(metadata);
     for (const warning of metadata.warnings) if (!metadataWarnings.has(warning)) {
         metadataWarnings.add(warning);
         console.warn(warning);

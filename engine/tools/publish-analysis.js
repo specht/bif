@@ -43,6 +43,8 @@ async function main(argv = process.argv.slice(2)) {
         console.log("Published .story-tools/analysis.json");
         console.log(`${result.summary.pages} pages · ${result.summary.choices} choices · ${result.summary.errors} errors · ${result.summary.warnings} warnings`);
         console.log(`SHA-256: ${result.contentHash}`);
+        for (const warning of result.fontSync?.warnings || []) console.warn(`Font warning: ${warning}`);
+        for (const error of result.fontSync?.errors || []) console.error(`Font error: ${error}`);
       };
       const watcher = await startProjectAnalysisWatch(options.project, {
         publishOptions: { publisher: NPM_PUBLISHER },
@@ -68,6 +70,8 @@ async function main(argv = process.argv.slice(2)) {
     console.log("Published .story-tools/analysis.json");
     console.log(`${result.summary.pages} pages · ${result.summary.choices} choices · ${result.summary.errors} errors · ${result.summary.warnings} warnings`);
     console.log(`SHA-256: ${result.contentHash}`);
+    for (const warning of result.fontSync?.warnings || []) console.warn(`Font warning: ${warning}`);
+    for (const error of result.fontSync?.errors || []) console.error(`Font error: ${error}`);
     return 0;
   } catch (error) {
     const code = error?.code ? ` (${error.code})` : "";

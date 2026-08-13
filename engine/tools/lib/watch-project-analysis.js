@@ -8,6 +8,8 @@ function ignoredPath(projectRoot, candidate) {
   return relative === '.story-tools' || relative.startsWith('.story-tools/')
     || relative === 'node_modules' || relative.startsWith('node_modules/')
     || relative === '.git' || relative.startsWith('.git/')
+    || /(^|\/)bif-assets(?:\/|$)/.test(relative)
+    || /(^|\/)\.bif-assets\.tmp-[^/]+(?:\/|$)/.test(relative)
     || /(^|\/)(?:\.?#|#).*#$/.test(relative)
     || /~$/.test(relative);
 }

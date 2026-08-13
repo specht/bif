@@ -2,6 +2,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { analyzeStory } = require("./story-analyzer");
 const { buildBrowserAnalysisPublication, canonicalJson } = require("./browser-analysis-publication");
+const { syncStoryFonts } = require("./story-fonts");
 const packageMetadata = require("../../../package.json");
 
 const DEFAULT_NPM_PUBLISHER = Object.freeze({
@@ -95,6 +96,11 @@ async function publishProjectAnalysis(projectRoot = process.cwd(), options = {})
     throw errorFor("project-config-invalid", `Invalid BIF project config: ${configError.message}`, root);
   }
 
+  let fontSync = { families: [], downloaded: false, errors: [], warnings: [] };
+  if (analysis.project.pagesPath) {
+    fontSync = await (options.syncStoryFonts || syncStoryFonts)(root, analysis.project, options.fontOptions || {});
+  }
+
   let publication;
   let serialized;
   try {
@@ -112,6 +118,7 @@ async function publishProjectAnalysis(projectRoot = process.cwd(), options = {})
     contentHash: publication.contentHash,
     analysisHash: publication.analysisHash,
     summary: publication.summary,
+    fontSync,
     outputPath: path.join(root, ".story-tools", "analysis.json"),
   };
   if (!current(options)) return { ...baseResult, published: false, stale: true };

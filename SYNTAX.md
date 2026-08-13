@@ -6,11 +6,32 @@ This reference assumes you completed the quick start in [README.md](README.md).
 
 The configured story folder contains playable `.md` files directly inside it. A filename without `.md` is its page ID: `2.md` has ID `2`. BIF always starts at `1.md`. Page IDs are case-sensitive and should not contain `/`.
 
-Subdirectories hold assets, not playable pages. Notes that are not story pages belong outside the configured story folder.
+Subdirectories hold assets, not playable pages. Notes that are not story pages belong outside the configured story folder. `bif-assets/` is reserved for generated BIF files such as locally cached story fonts.
 
-## 2. Headings, prose, and Markdown
+## 2. Story appearance, headings, and Markdown
 
-Write ordinary Markdown. The title comes from supported title metadata or the first H1 in `1.md`:
+The optional front matter at the top of `1.md` contains story-wide settings. It is not repeated on other pages.
+
+```markdown
+---
+theme: paper
+font_body: Literata
+font_heading: DM Serif Display
+---
+
+# Night train
+```
+
+Available themes are `default`, `paper`, `mystery`, `midnight`, `terminal`, and `playful`. Every theme provides its own default body and heading fonts. Override either one by entering an exact family name from [Google Fonts](https://fonts.google.com/). BIF authoring downloads non-bundled fonts into the story's generated `bif-assets/` directory so the playable story uses local font files. The `bif-assets/` name is reserved for BIF.
+
+The supported front-matter settings are:
+
+- `title`: optional title override
+- `theme`: reader theme
+- `font_body`: body and choice font
+- `font_heading`: heading font
+
+Write ordinary Markdown after the front matter. The title comes from `title` metadata or the first H1 in `1.md`:
 
 ```markdown
 # Night train

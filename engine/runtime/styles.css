@@ -382,10 +382,59 @@ button {
 }
 
 #game_pane {
+    --story-body-font: "IBM Plex Sans", sans-serif;
+    --story-heading-font: "IBM Plex Sans", sans-serif;
+    --story-heading-color: var(--fg-color);
+    --story-accent-color: var(--fg-color);
+    --story-choice-radius: 4px;
+    --story-heading-letter-spacing: normal;
+    --story-heading-weight: 650;
+    --story-line-height: 1.5;
+
+    /* Recompute mixes inside the themed reader instead of inheriting the authoring palette. */
+    --mix-60: color-mix(in hsl, var(--bg-color) 60%, var(--fg-color));
+    --mix-65: color-mix(in hsl, var(--bg-color) 65%, var(--fg-color));
+    --mix-70: color-mix(in hsl, var(--bg-color) 70%, var(--fg-color));
+    --mix-75: color-mix(in hsl, var(--bg-color) 75%, var(--fg-color));
+    --mix-80: color-mix(in hsl, var(--bg-color) 80%, var(--fg-color));
+    --mix-85: color-mix(in hsl, var(--bg-color) 85%, var(--fg-color));
+    --mix-90: color-mix(in hsl, var(--bg-color) 90%, var(--fg-color));
+    --mix-95: color-mix(in hsl, var(--bg-color) 95%, var(--fg-color));
+
     position: relative;
     max-width: 30em;
     margin: auto;
     padding: 1em;
+    font-family: var(--story-body-font);
+}
+
+#game_pane h1,
+#game_pane h2,
+#game_pane h3,
+#game_pane h4,
+#game_pane h5,
+#game_pane h6 {
+    color: var(--story-heading-color);
+    font-family: var(--story-heading-font);
+    font-weight: var(--story-heading-weight);
+    letter-spacing: var(--story-heading-letter-spacing);
+    text-wrap: balance;
+}
+
+#game_pane p,
+#game_pane blockquote,
+#game_pane li {
+    line-height: var(--story-line-height);
+}
+
+#game_pane a:not(.story-choice) {
+    color: var(--story-accent-color);
+}
+
+#game_pane .story-choice,
+#game_pane button.pagelink {
+    border-radius: var(--story-choice-radius);
+    font-family: var(--story-body-font);
 }
 
 .story-controls-layer {
@@ -1111,5 +1160,182 @@ body,
     #graph-container .edge.active .graph-edge-path,
     #graph-container .edge.active .graph-edge-arrow {
         filter: drop-shadow(0 0 0.35px rgba(0, 0, 0, 0.95));
+    }
+}
+
+
+/* Story themes -----------------------------------------------------------
+   Themes deliberately affect only the reader. In authoring mode the graph
+   and Problems UI keep BIF's neutral interface palette. */
+
+html[data-story-theme="paper"] body:not(.dev),
+html[data-story-theme="paper"] #game_pane {
+    --bg-color: #f7f0e2;
+    --fg-color: #342c23;
+    --surface-1: #fffaf0;
+    --surface-2: #eee3cf;
+    --surface-3: #e3d5bb;
+    --border-color: #c8b89b;
+    --border-strong: #9f8966;
+    --muted-color: #756550;
+    --shadow-color: rgba(77, 57, 33, 0.18);
+    --story-heading-color: #5b3423;
+    --story-accent-color: #7a432b;
+    --story-choice-radius: 0.2rem;
+    --story-heading-letter-spacing: 0.01em;
+    --story-heading-weight: 400;
+    --story-line-height: 1.62;
+}
+
+html[data-story-theme="mystery"] body:not(.dev),
+html[data-story-theme="mystery"] #game_pane {
+    --bg-color: #efede8;
+    --fg-color: #292426;
+    --surface-1: #f8f6f1;
+    --surface-2: #e4dfd8;
+    --surface-3: #d8d0c8;
+    --border-color: #b8aca5;
+    --border-strong: #83736f;
+    --muted-color: #6c6261;
+    --shadow-color: rgba(38, 24, 28, 0.2);
+    --story-heading-color: #632b3a;
+    --story-accent-color: #7d3347;
+    --story-choice-radius: 0.1rem;
+    --story-heading-letter-spacing: 0.035em;
+    --story-heading-weight: 400;
+    --story-line-height: 1.58;
+}
+
+html[data-story-theme="midnight"] body:not(.dev),
+html[data-story-theme="midnight"] #game_pane {
+    --bg-color: #eef3fa;
+    --fg-color: #182235;
+    --surface-1: #f8fbff;
+    --surface-2: #dfe8f4;
+    --surface-3: #cedbea;
+    --border-color: #aebed2;
+    --border-strong: #768ba7;
+    --muted-color: #586a82;
+    --shadow-color: rgba(26, 52, 88, 0.18);
+    --story-heading-color: #173f73;
+    --story-accent-color: #245a99;
+    --story-choice-radius: 0.7rem;
+    --story-heading-letter-spacing: -0.015em;
+    --story-heading-weight: 650;
+    --story-line-height: 1.55;
+}
+
+html[data-story-theme="terminal"] body:not(.dev),
+html[data-story-theme="terminal"] #game_pane {
+    --bg-color: #eef4ea;
+    --fg-color: #15351a;
+    --surface-1: #f7fbf4;
+    --surface-2: #dce9d8;
+    --surface-3: #cadbc5;
+    --border-color: #9eb79a;
+    --border-strong: #6e8e69;
+    --muted-color: #527052;
+    --shadow-color: rgba(30, 70, 32, 0.16);
+    --story-heading-color: #145f25;
+    --story-accent-color: #16702b;
+    --story-choice-radius: 0;
+    --story-heading-letter-spacing: 0.055em;
+    --story-heading-weight: 700;
+    --story-line-height: 1.5;
+}
+
+html[data-story-theme="playful"] body:not(.dev),
+html[data-story-theme="playful"] #game_pane {
+    --bg-color: #fff7fb;
+    --fg-color: #382d38;
+    --surface-1: #fffdfd;
+    --surface-2: #f7e7f0;
+    --surface-3: #eed5e5;
+    --border-color: #d4acc4;
+    --border-strong: #a87896;
+    --muted-color: #795f71;
+    --shadow-color: rgba(113, 49, 91, 0.16);
+    --story-heading-color: #8b2f68;
+    --story-accent-color: #9d3b77;
+    --story-choice-radius: 1rem;
+    --story-heading-letter-spacing: -0.015em;
+    --story-heading-weight: 650;
+    --story-line-height: 1.55;
+}
+
+@media (prefers-color-scheme: dark) {
+    html[data-story-theme="paper"] body:not(.dev),
+    html[data-story-theme="paper"] #game_pane {
+        --bg-color: #211d18;
+        --fg-color: #eee3d1;
+        --surface-1: #2b261f;
+        --surface-2: #342d24;
+        --surface-3: #40362a;
+        --border-color: #665845;
+        --border-strong: #8a7457;
+        --muted-color: #b8a992;
+        --shadow-color: rgba(0, 0, 0, 0.55);
+        --story-heading-color: #e0b18c;
+        --story-accent-color: #e0a477;
+    }
+
+    html[data-story-theme="mystery"] body:not(.dev),
+    html[data-story-theme="mystery"] #game_pane {
+        --bg-color: #181416;
+        --fg-color: #eee7e8;
+        --surface-1: #211b1e;
+        --surface-2: #2c2327;
+        --surface-3: #382a30;
+        --border-color: #654b55;
+        --border-strong: #8b6573;
+        --muted-color: #baaab0;
+        --shadow-color: rgba(0, 0, 0, 0.62);
+        --story-heading-color: #e6a4b7;
+        --story-accent-color: #e290aa;
+    }
+
+    html[data-story-theme="midnight"] body:not(.dev),
+    html[data-story-theme="midnight"] #game_pane {
+        --bg-color: #0f1725;
+        --fg-color: #e7edf7;
+        --surface-1: #162033;
+        --surface-2: #1d2a40;
+        --surface-3: #26354d;
+        --border-color: #425878;
+        --border-strong: #637da3;
+        --muted-color: #a6b4ca;
+        --shadow-color: rgba(0, 0, 0, 0.58);
+        --story-heading-color: #9fc7ff;
+        --story-accent-color: #82b7ff;
+    }
+
+    html[data-story-theme="terminal"] body:not(.dev),
+    html[data-story-theme="terminal"] #game_pane {
+        --bg-color: #071009;
+        --fg-color: #b7f5a1;
+        --surface-1: #0b170d;
+        --surface-2: #102015;
+        --surface-3: #172a1b;
+        --border-color: #315c37;
+        --border-strong: #4f8556;
+        --muted-color: #80a97b;
+        --shadow-color: rgba(0, 0, 0, 0.7);
+        --story-heading-color: #75ff83;
+        --story-accent-color: #6af177;
+    }
+
+    html[data-story-theme="playful"] body:not(.dev),
+    html[data-story-theme="playful"] #game_pane {
+        --bg-color: #241b23;
+        --fg-color: #f8eaf4;
+        --surface-1: #2d222c;
+        --surface-2: #3a2937;
+        --surface-3: #483243;
+        --border-color: #704f69;
+        --border-strong: #936b88;
+        --muted-color: #c7aabd;
+        --shadow-color: rgba(0, 0, 0, 0.56);
+        --story-heading-color: #ffafd8;
+        --story-accent-color: #ff97cc;
     }
 }

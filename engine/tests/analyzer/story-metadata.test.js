@@ -3,7 +3,7 @@ const test = require('node:test');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { resolveStoryMetadata, FALLBACK_TITLE } = require('../../runtime/modules/story-metadata');
+const { resolveStoryMetadata, FALLBACK_TITLE, effectiveAppearance, googleFontFamilies } = require('../../runtime/modules/story-metadata');
 const { analyzeStory } = require('../../tools/lib/story-analyzer');
 
 test('story metadata resolves front matter, quoted values, H1 precedence, and stripped body', () => {
@@ -49,4 +49,27 @@ test('config path selects the directory and title comes from page 1', async () =
   assert.equal(result.project.startPage, '1');
   assert.equal(result.project.pagesPath, 'chosen');
   assert.equal(result.diagnostics.some(item => item.code === 'missing-story-title'), false);
+});
+
+
+test('story metadata resolves themes and separate body and heading fonts', () => {
+  const metadata = resolveStoryMetadata('---\ntheme: mystery\nfont_body: "Atkinson Hyperlegible"\nfont_heading: Special Elite\n---\n# Door\n');
+  assert.deepEqual(metadata.appearance, {
+    theme: 'mystery',
+    fontBody: 'Atkinson Hyperlegible',
+    fontHeading: 'Special Elite',
+  });
+  assert.equal(metadata.effectiveAppearance.fontBody, 'Atkinson Hyperlegible');
+  assert.equal(metadata.effectiveAppearance.fontHeading, 'Special Elite');
+  assert.deepEqual(googleFontFamilies(metadata.appearance), ['Atkinson Hyperlegible', 'Special Elite']);
+  assert.equal(metadata.issues.length, 0);
+});
+
+test('themes provide font pairs and invalid themes fall back safely', () => {
+  const paper = effectiveAppearance({ theme: 'paper' });
+  assert.equal(paper.fontBody, 'Literata');
+  assert.equal(paper.fontHeading, 'DM Serif Display');
+  const invalid = resolveStoryMetadata('---\ntheme: definitely-not-a-theme\n---\n# Story\n');
+  assert.equal(invalid.appearance.theme, 'default');
+  assert.ok(invalid.issues.some(item => item.code === 'unknown-theme'));
 });

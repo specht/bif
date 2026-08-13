@@ -50,9 +50,9 @@ Every story begins at `1.md`. The title comes from title metadata or the first H
 The starter deliberately contains only one page:
 
 ```markdown
-# Meine Geschichte
+# Nach Schulschluss
 
-Hier beginnt deine Geschichte.
+Du willst gerade gehen, da fällt dir ein: Deine Projektmappe liegt noch im Materialschrank.
 ```
 
 Add another page and link to it with a choice:
@@ -62,6 +62,38 @@ Add another page and link to it with a choice:
 ```
 
 Then create `2.md` in the same story folder.
+
+
+## Themes and fonts
+
+Story-wide appearance belongs in the front matter at the top of `1.md`. It is optional; a story without front matter keeps the default BIF appearance.
+
+```markdown
+---
+theme: mystery
+font_body: Libre Baskerville
+font_heading: Special Elite
+---
+
+# Nach Schulschluss
+
+Du willst gerade gehen ...
+```
+
+Built-in themes are `default`, `paper`, `mystery`, `midnight`, `terminal`, and `playful`. Each theme already has a matching heading/body font pair, so `theme:` can be used by itself. `font_body:` and `font_heading:` override either font independently.
+
+| Theme | Body | Headings |
+| --- | --- | --- |
+| `default` | IBM Plex Sans | IBM Plex Sans |
+| `paper` | Literata | DM Serif Display |
+| `mystery` | Libre Baskerville | Special Elite |
+| `midnight` | Inter | Space Grotesk |
+| `terminal` | IBM Plex Mono | IBM Plex Mono |
+| `playful` | Nunito | Fredoka |
+
+To choose another typeface, browse [Google Fonts](https://fonts.google.com/), copy the family name exactly, and put it in `font_body:` or `font_heading:`. While `npm run dev` is running, BIF downloads the required font files into the selected story's generated `bif-assets/` directory and rewrites the Google Fonts stylesheet to use those local files. Readers of the published story therefore do not need to contact Google Fonts.
+
+`bif-assets/` is reserved for BIF-generated story files. Do not put your own images, audio, or other assets there.
 
 ## Graph and Problems
 

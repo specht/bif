@@ -79,6 +79,7 @@ test('watch exclusions cover generated, dependency, Git, and editor files', () =
   assert.equal(ignoredPath(root, path.join(root, '.story-tools', 'analysis.json')), true);
   assert.equal(ignoredPath(root, path.join(root, 'node_modules', 'x.js')), true);
   assert.equal(ignoredPath(root, path.join(root, '.git', 'index')), true);
+  assert.equal(ignoredPath(root, path.join(root, 'pages', 'bif-assets', 'fonts.css')), true);
   assert.equal(ignoredPath(root, path.join(root, 'pages', '1.md~')), true);
   assert.equal(ignoredPath(root, path.join(root, 'pages', '1.md')), false);
 });

@@ -90,3 +90,38 @@ test('the exact minimum upload plays below a nested static path', async ({ page 
     await rm(deployment, { recursive: true });
   }
 });
+
+test('story front matter applies a theme and separate bundled body and heading fonts', async ({ page }) => {
+  await useFixture(page, 'engine/test-fixtures/player-basic/pages');
+  await page.route(/\/engine\/test-fixtures\/player-basic\/pages\/1\.md(?:\?.*)?$/, route => route.fulfill({
+    contentType: 'text/markdown',
+    body: '---\ntheme: paper\nfont_body: IBM Plex Mono\nfont_heading: IBM Plex Sans\n---\n# Start\n\nStyled story.\n',
+  }));
+  await page.goto('/?mode=game');
+  await expect(page.getByRole('heading', { name: 'Start' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-story-theme', 'paper');
+  const fonts = await page.evaluate(() => ({
+    body: getComputedStyle(document.getElementById('game_pane')).fontFamily,
+    heading: getComputedStyle(document.querySelector('#game_pane h1')).fontFamily,
+  }));
+  expect(fonts.body).toContain('IBM Plex Mono');
+  expect(fonts.heading).toContain('IBM Plex Sans');
+});
+
+test('Google font metadata makes the reader request only the story-local generated stylesheet', async ({ page }) => {
+  await useFixture(page, 'engine/test-fixtures/player-basic/pages');
+  await page.route(/\/engine\/test-fixtures\/player-basic\/pages\/1\.md(?:\?.*)?$/, route => route.fulfill({
+    contentType: 'text/markdown',
+    body: '---\nfont_body: Literata\nfont_heading: IBM Plex Sans\n---\n# Start\n\nLocal font story.\n',
+  }));
+  await page.route(/\/engine\/test-fixtures\/player-basic\/pages\/bif-assets\/fonts\.css(?:\?.*)?$/, route => route.fulfill({
+    contentType: 'text/css',
+    body: '@font-face { font-family: "Literata"; src: local("Arial"); }',
+  }));
+  const requests = [];
+  page.on('request', request => requests.push(request.url()));
+  await page.goto('/?mode=game');
+  await expect(page.getByRole('heading', { name: 'Start' })).toBeVisible();
+  await expect.poll(() => requests.some(url => url.includes('/pages/bif-assets/fonts.css'))).toBe(true);
+  expect(requests.some(url => url.includes('fonts.googleapis.com') || url.includes('fonts.gstatic.com'))).toBe(false);
+});
