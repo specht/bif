@@ -441,6 +441,9 @@ button {
 #game_pane button.pagelink:hover {
     background-color: color-mix(in srgb, var(--story-accent-color) 8%, var(--surface-2));
     border-color: color-mix(in srgb, var(--story-accent-color) 38%, var(--border-strong));
+    box-shadow:
+        0 1px 2px var(--story-shadow),
+        0 2px 5px var(--story-shadow-soft);
 }
 
 /* A choice that has already been made remains visible as part of the story
