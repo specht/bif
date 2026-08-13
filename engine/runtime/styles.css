@@ -1164,6 +1164,59 @@ body,
 }
 
 
+/* Story brightness -------------------------------------------------------
+   Themes choose a preferred brightness, but 1.md can override it. The
+   runtime resolves `system` against prefers-color-scheme and keeps this
+   attribute current if the operating-system preference changes. */
+
+html[data-story-brightness="light"] body:not(.dev),
+html[data-story-brightness="light"] #game_pane {
+    color-scheme: light;
+    --bg-color: #fff;
+    --fg-color: #333;
+    --surface-1: #fff;
+    --surface-2: #f7f7f7;
+    --surface-3: #ededed;
+    --border-color: #c9c9c9;
+    --border-strong: #999;
+    --muted-color: #666;
+    --shadow-color: rgba(0, 0, 0, 0.16);
+    --error-color: #b42318;
+    --warning-color: #8a5a00;
+    --success-color: #18794e;
+    --notice-bg: #fff4ce;
+    --notice-border: #9a6700;
+    --notice-fg: #4d3600;
+}
+
+html[data-story-brightness="dark"] body:not(.dev),
+html[data-story-brightness="dark"] #game_pane {
+    color-scheme: dark;
+    --bg-color: #1f1f1f;
+    --fg-color: #ededed;
+    --surface-1: #252525;
+    --surface-2: #2c2c2c;
+    --surface-3: #363636;
+    --border-color: #555;
+    --border-strong: #777;
+    --muted-color: #b6b6b6;
+    --shadow-color: rgba(0, 0, 0, 0.55);
+    --error-color: #ff7b72;
+    --warning-color: #f2cc60;
+    --success-color: #56d364;
+    --notice-bg: #3b3218;
+    --notice-border: #d6a419;
+    --notice-fg: #ffe7a3;
+}
+
+html[data-story-brightness="dark"] #game_pane img {
+    filter: brightness(0.94);
+}
+
+html[data-story-brightness="light"] #game_pane img {
+    filter: none;
+}
+
 /* Story themes -----------------------------------------------------------
    Themes deliberately affect only the reader. In authoring mode the graph
    and Problems UI keep BIF's neutral interface palette. */
@@ -1263,79 +1316,77 @@ html[data-story-theme="playful"] #game_pane {
     --story-line-height: 1.55;
 }
 
-@media (prefers-color-scheme: dark) {
-    html[data-story-theme="paper"] body:not(.dev),
-    html[data-story-theme="paper"] #game_pane {
-        --bg-color: #211d18;
-        --fg-color: #eee3d1;
-        --surface-1: #2b261f;
-        --surface-2: #342d24;
-        --surface-3: #40362a;
-        --border-color: #665845;
-        --border-strong: #8a7457;
-        --muted-color: #b8a992;
-        --shadow-color: rgba(0, 0, 0, 0.55);
-        --story-heading-color: #e0b18c;
-        --story-accent-color: #e0a477;
-    }
+html[data-story-brightness="dark"][data-story-theme="paper"] body:not(.dev),
+html[data-story-brightness="dark"][data-story-theme="paper"] #game_pane {
+    --bg-color: #211d18;
+    --fg-color: #eee3d1;
+    --surface-1: #2b261f;
+    --surface-2: #342d24;
+    --surface-3: #40362a;
+    --border-color: #665845;
+    --border-strong: #8a7457;
+    --muted-color: #b8a992;
+    --shadow-color: rgba(0, 0, 0, 0.55);
+    --story-heading-color: #e0b18c;
+    --story-accent-color: #e0a477;
+}
 
-    html[data-story-theme="mystery"] body:not(.dev),
-    html[data-story-theme="mystery"] #game_pane {
-        --bg-color: #181416;
-        --fg-color: #eee7e8;
-        --surface-1: #211b1e;
-        --surface-2: #2c2327;
-        --surface-3: #382a30;
-        --border-color: #654b55;
-        --border-strong: #8b6573;
-        --muted-color: #baaab0;
-        --shadow-color: rgba(0, 0, 0, 0.62);
-        --story-heading-color: #e6a4b7;
-        --story-accent-color: #e290aa;
-    }
+html[data-story-brightness="dark"][data-story-theme="mystery"] body:not(.dev),
+html[data-story-brightness="dark"][data-story-theme="mystery"] #game_pane {
+    --bg-color: #181416;
+    --fg-color: #eee7e8;
+    --surface-1: #211b1e;
+    --surface-2: #2c2327;
+    --surface-3: #382a30;
+    --border-color: #654b55;
+    --border-strong: #8b6573;
+    --muted-color: #baaab0;
+    --shadow-color: rgba(0, 0, 0, 0.62);
+    --story-heading-color: #e6a4b7;
+    --story-accent-color: #e290aa;
+}
 
-    html[data-story-theme="midnight"] body:not(.dev),
-    html[data-story-theme="midnight"] #game_pane {
-        --bg-color: #0f1725;
-        --fg-color: #e7edf7;
-        --surface-1: #162033;
-        --surface-2: #1d2a40;
-        --surface-3: #26354d;
-        --border-color: #425878;
-        --border-strong: #637da3;
-        --muted-color: #a6b4ca;
-        --shadow-color: rgba(0, 0, 0, 0.58);
-        --story-heading-color: #9fc7ff;
-        --story-accent-color: #82b7ff;
-    }
+html[data-story-brightness="dark"][data-story-theme="midnight"] body:not(.dev),
+html[data-story-brightness="dark"][data-story-theme="midnight"] #game_pane {
+    --bg-color: #0f1725;
+    --fg-color: #e7edf7;
+    --surface-1: #162033;
+    --surface-2: #1d2a40;
+    --surface-3: #26354d;
+    --border-color: #425878;
+    --border-strong: #637da3;
+    --muted-color: #a6b4ca;
+    --shadow-color: rgba(0, 0, 0, 0.58);
+    --story-heading-color: #9fc7ff;
+    --story-accent-color: #82b7ff;
+}
 
-    html[data-story-theme="terminal"] body:not(.dev),
-    html[data-story-theme="terminal"] #game_pane {
-        --bg-color: #071009;
-        --fg-color: #b7f5a1;
-        --surface-1: #0b170d;
-        --surface-2: #102015;
-        --surface-3: #172a1b;
-        --border-color: #315c37;
-        --border-strong: #4f8556;
-        --muted-color: #80a97b;
-        --shadow-color: rgba(0, 0, 0, 0.7);
-        --story-heading-color: #75ff83;
-        --story-accent-color: #6af177;
-    }
+html[data-story-brightness="dark"][data-story-theme="terminal"] body:not(.dev),
+html[data-story-brightness="dark"][data-story-theme="terminal"] #game_pane {
+    --bg-color: #071009;
+    --fg-color: #b7f5a1;
+    --surface-1: #0b170d;
+    --surface-2: #102015;
+    --surface-3: #172a1b;
+    --border-color: #315c37;
+    --border-strong: #4f8556;
+    --muted-color: #80a97b;
+    --shadow-color: rgba(0, 0, 0, 0.7);
+    --story-heading-color: #75ff83;
+    --story-accent-color: #6af177;
+}
 
-    html[data-story-theme="playful"] body:not(.dev),
-    html[data-story-theme="playful"] #game_pane {
-        --bg-color: #241b23;
-        --fg-color: #f8eaf4;
-        --surface-1: #2d222c;
-        --surface-2: #3a2937;
-        --surface-3: #483243;
-        --border-color: #704f69;
-        --border-strong: #936b88;
-        --muted-color: #c7aabd;
-        --shadow-color: rgba(0, 0, 0, 0.56);
-        --story-heading-color: #ffafd8;
-        --story-accent-color: #ff97cc;
-    }
+html[data-story-brightness="dark"][data-story-theme="playful"] body:not(.dev),
+html[data-story-brightness="dark"][data-story-theme="playful"] #game_pane {
+    --bg-color: #241b23;
+    --fg-color: #f8eaf4;
+    --surface-1: #2d222c;
+    --surface-2: #3a2937;
+    --surface-3: #483243;
+    --border-color: #704f69;
+    --border-strong: #936b88;
+    --muted-color: #c7aabd;
+    --shadow-color: rgba(0, 0, 0, 0.56);
+    --story-heading-color: #ffafd8;
+    --story-accent-color: #ff97cc;
 }

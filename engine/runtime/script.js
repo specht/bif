@@ -44,6 +44,19 @@ const el = {
 }
 
 const cache_buster = `${Date.now()}`;
+const storyDarkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+let storyBrightnessPreference = 'system';
+
+function updateStoryBrightness() {
+    const brightness = storyBrightnessPreference === 'system'
+        ? (storyDarkModeQuery.matches ? 'dark' : 'light')
+        : storyBrightnessPreference;
+    document.documentElement.dataset.storyBrightness = brightness;
+}
+
+storyDarkModeQuery.addEventListener('change', () => {
+    if (storyBrightnessPreference === 'system') updateStoryBrightness();
+});
 
 let history = [];
 let sessionEvents = [];
@@ -958,6 +971,8 @@ function applyStoryAppearance(metadata) {
     const appearance = metadata.appearance || { theme: 'default' };
     const effective = metadata.effectiveAppearance || BifStoryMetadata.effectiveAppearance(appearance);
     document.documentElement.dataset.storyTheme = effective.theme;
+    storyBrightnessPreference = effective.brightness;
+    updateStoryBrightness();
     el.gamePane.style.setProperty('--story-body-font', cssFontStack(effective.fontBody, effective.generic));
     el.gamePane.style.setProperty('--story-heading-font', cssFontStack(effective.fontHeading, effective.generic));
     ensureStoryFontStylesheet(BifStoryMetadata.googleFontFamilies(appearance));

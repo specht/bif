@@ -56,6 +56,7 @@ test('story metadata resolves themes and separate body and heading fonts', () =>
   const metadata = resolveStoryMetadata('---\ntheme: mystery\nfont_body: "Atkinson Hyperlegible"\nfont_heading: Special Elite\n---\n# Door\n');
   assert.deepEqual(metadata.appearance, {
     theme: 'mystery',
+    brightness: null,
     fontBody: 'Atkinson Hyperlegible',
     fontHeading: 'Special Elite',
   });
@@ -63,6 +64,32 @@ test('story metadata resolves themes and separate body and heading fonts', () =>
   assert.equal(metadata.effectiveAppearance.fontHeading, 'Special Elite');
   assert.deepEqual(googleFontFamilies(metadata.appearance), ['Atkinson Hyperlegible', 'Special Elite']);
   assert.equal(metadata.issues.length, 0);
+});
+
+
+test('themes provide brightness defaults and story metadata can override them', () => {
+  assert.equal(effectiveAppearance({ theme: 'default' }).brightness, 'system');
+  assert.equal(effectiveAppearance({ theme: 'paper' }).brightness, 'light');
+  assert.equal(effectiveAppearance({ theme: 'terminal' }).brightness, 'dark');
+
+  const override = resolveStoryMetadata(`---
+theme: terminal
+brightness: light
+---
+# Story
+`);
+  assert.equal(override.appearance.brightness, 'light');
+  assert.equal(override.effectiveAppearance.brightness, 'light');
+
+  const invalid = resolveStoryMetadata(`---
+theme: terminal
+brightness: sepia
+---
+# Story
+`);
+  assert.equal(invalid.appearance.brightness, null);
+  assert.equal(invalid.effectiveAppearance.brightness, 'dark');
+  assert.ok(invalid.issues.some(item => item.code === 'unknown-brightness'));
 });
 
 test('themes provide font pairs and invalid themes fall back safely', () => {

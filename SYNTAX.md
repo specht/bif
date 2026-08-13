@@ -22,12 +22,13 @@ font_heading: DM Serif Display
 # Night train
 ```
 
-Available themes are `default`, `paper`, `mystery`, `midnight`, `terminal`, and `playful`. Every theme provides its own default body and heading fonts. Override either one by entering an exact family name from [Google Fonts](https://fonts.google.com/). BIF authoring downloads non-bundled fonts into the story's generated `bif-assets/` directory so the playable story uses local font files. The `bif-assets/` name is reserved for BIF.
+Available themes are `default`, `paper`, `mystery`, `midnight`, `terminal`, and `playful`. Every theme provides its own default body and heading fonts and a preferred brightness. `default` follows the system; `paper` and `playful` prefer light; `mystery`, `midnight`, and `terminal` prefer dark. Set `brightness: light`, `brightness: dark`, or `brightness: system` to override the theme. `system` follows the reader's operating-system/browser preference. Override either font by entering an exact family name from [Google Fonts](https://fonts.google.com/). BIF authoring downloads non-bundled fonts into the story's generated `bif-assets/` directory so the playable story uses local font files. The `bif-assets/` name is reserved for BIF.
 
 The supported front-matter settings are:
 
 - `title`: optional title override
 - `theme`: reader theme
+- `brightness`: optional `light`, `dark`, or `system` override
 - `font_body`: body and choice font
 - `font_heading`: heading font
 

@@ -6,16 +6,17 @@
     const FALLBACK_TITLE = 'Untitled story';
 
     const STORY_THEMES = Object.freeze({
-        default: Object.freeze({ bodyFont: 'IBM Plex Sans', headingFont: 'IBM Plex Sans', generic: 'sans-serif' }),
-        paper: Object.freeze({ bodyFont: 'Literata', headingFont: 'DM Serif Display', generic: 'serif' }),
-        mystery: Object.freeze({ bodyFont: 'Libre Baskerville', headingFont: 'Special Elite', generic: 'serif' }),
-        midnight: Object.freeze({ bodyFont: 'Inter', headingFont: 'Space Grotesk', generic: 'sans-serif' }),
-        terminal: Object.freeze({ bodyFont: 'IBM Plex Mono', headingFont: 'IBM Plex Mono', generic: 'monospace' }),
-        playful: Object.freeze({ bodyFont: 'Nunito', headingFont: 'Fredoka', generic: 'sans-serif' }),
+        default: Object.freeze({ bodyFont: 'IBM Plex Sans', headingFont: 'IBM Plex Sans', generic: 'sans-serif', brightness: 'system' }),
+        paper: Object.freeze({ bodyFont: 'Literata', headingFont: 'DM Serif Display', generic: 'serif', brightness: 'light' }),
+        mystery: Object.freeze({ bodyFont: 'Libre Baskerville', headingFont: 'Special Elite', generic: 'serif', brightness: 'dark' }),
+        midnight: Object.freeze({ bodyFont: 'Inter', headingFont: 'Space Grotesk', generic: 'sans-serif', brightness: 'dark' }),
+        terminal: Object.freeze({ bodyFont: 'IBM Plex Mono', headingFont: 'IBM Plex Mono', generic: 'monospace', brightness: 'dark' }),
+        playful: Object.freeze({ bodyFont: 'Nunito', headingFont: 'Fredoka', generic: 'sans-serif', brightness: 'light' }),
     });
 
     const BUNDLED_FONTS = Object.freeze(new Set(['IBM Plex Sans', 'IBM Plex Mono']));
-    const KNOWN_METADATA = new Set(['title', 'theme', 'font_body', 'font_heading']);
+    const STORY_BRIGHTNESSES = Object.freeze(new Set(['light', 'dark', 'system']));
+    const KNOWN_METADATA = new Set(['title', 'theme', 'brightness', 'font_body', 'font_heading']);
 
     function unquote(value) {
         const trimmed = value.trim();
@@ -105,6 +106,7 @@
             fontBody: appearance.fontBody || defaults.bodyFont,
             fontHeading: appearance.fontHeading || defaults.headingFont,
             generic: defaults.generic,
+            brightness: appearance.brightness || defaults.brightness,
         };
     }
 
@@ -128,6 +130,12 @@
             theme = 'default';
         }
 
+        let brightness = parsed.values.brightness?.value?.toLowerCase() || null;
+        if (brightness && !STORY_BRIGHTNESSES.has(brightness)) {
+            issues.push(issue('unknown-brightness', `Unknown brightness '${parsed.values.brightness?.value}'. Choose one of: light, dark, system. Using the theme default.`, parsed.values.brightness.line));
+            brightness = null;
+        }
+
         let fontBody = parsed.values.font_body?.value || null;
         let fontHeading = parsed.values.font_heading?.value || null;
         if (fontBody && !validFontName(fontBody)) {
@@ -145,7 +153,7 @@
             issues.push(issue('missing-story-title', `No game title found in ${sourcePath}. Add a front-matter title or a level-one heading. Using “${FALLBACK_TITLE}”.`));
         }
 
-        const appearance = { theme, fontBody, fontHeading };
+        const appearance = { theme, brightness, fontBody, fontHeading };
         return {
             title,
             titleSource: frontMatterTitle ? 'front-matter' : heading ? 'h1' : 'fallback',
@@ -160,6 +168,7 @@
     return {
         FALLBACK_TITLE,
         STORY_THEMES,
+        STORY_BRIGHTNESSES,
         BUNDLED_FONTS,
         resolveStoryMetadata,
         effectiveAppearance,

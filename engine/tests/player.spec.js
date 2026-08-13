@@ -108,6 +108,45 @@ test('story front matter applies a theme and separate bundled body and heading f
   expect(fonts.heading).toContain('IBM Plex Sans');
 });
 
+
+test('terminal theme defaults to dark even when the system preference is light', async ({ page }) => {
+  await useFixture(page, 'engine/test-fixtures/player-basic/pages');
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.route(/\/engine\/test-fixtures\/player-basic\/pages\/1\.md(?:\?.*)?$/, route => route.fulfill({
+    contentType: 'text/markdown',
+    body: '---\ntheme: terminal\n---\n# Start\n\nDark terminal.\n',
+  }));
+  await page.goto('/?mode=game');
+  await expect(page.getByRole('heading', { name: 'Start' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-story-brightness', 'dark');
+  await expect(page.locator('#game_pane')).toHaveCSS('background-color', 'rgb(7, 16, 9)');
+});
+
+test('brightness metadata can override a theme default', async ({ page }) => {
+  await useFixture(page, 'engine/test-fixtures/player-basic/pages');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.route(/\/engine\/test-fixtures\/player-basic\/pages\/1\.md(?:\?.*)?$/, route => route.fulfill({
+    contentType: 'text/markdown',
+    body: '---\ntheme: terminal\nbrightness: light\n---\n# Start\n\nLight override.\n',
+  }));
+  await page.goto('/?mode=game');
+  await expect(page.locator('html')).toHaveAttribute('data-story-brightness', 'light');
+  await expect(page.locator('#game_pane')).toHaveCSS('background-color', 'rgb(238, 244, 234)');
+});
+
+test('brightness system follows changes to the system color scheme', async ({ page }) => {
+  await useFixture(page, 'engine/test-fixtures/player-basic/pages');
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.route(/\/engine\/test-fixtures\/player-basic\/pages\/1\.md(?:\?.*)?$/, route => route.fulfill({
+    contentType: 'text/markdown',
+    body: '---\ntheme: terminal\nbrightness: system\n---\n# Start\n',
+  }));
+  await page.goto('/?mode=game');
+  await expect(page.locator('html')).toHaveAttribute('data-story-brightness', 'light');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(page.locator('html')).toHaveAttribute('data-story-brightness', 'dark');
+});
+
 test('Google font metadata makes the reader request only the story-local generated stylesheet', async ({ page }) => {
   await useFixture(page, 'engine/test-fixtures/player-basic/pages');
   await page.route(/\/engine\/test-fixtures\/player-basic\/pages\/1\.md(?:\?.*)?$/, route => route.fulfill({

@@ -80,16 +80,27 @@ font_heading: Special Elite
 Du willst gerade gehen ...
 ```
 
-Built-in themes are `default`, `paper`, `mystery`, `midnight`, `terminal`, and `playful`. Each theme already has a matching heading/body font pair, so `theme:` can be used by itself. `font_body:` and `font_heading:` override either font independently.
+Built-in themes are `default`, `paper`, `mystery`, `midnight`, `terminal`, and `playful`. Each theme already has a matching heading/body font pair and a preferred brightness, so `theme:` can be used by itself. `font_body:` and `font_heading:` override either font independently.
 
-| Theme | Body | Headings |
-| --- | --- | --- |
-| `default` | IBM Plex Sans | IBM Plex Sans |
-| `paper` | Literata | DM Serif Display |
-| `mystery` | Libre Baskerville | Special Elite |
-| `midnight` | Inter | Space Grotesk |
-| `terminal` | IBM Plex Mono | IBM Plex Mono |
-| `playful` | Nunito | Fredoka |
+| Theme | Body | Headings | Brightness |
+| --- | --- | --- | --- |
+| `default` | IBM Plex Sans | IBM Plex Sans | system |
+| `paper` | Literata | DM Serif Display | light |
+| `mystery` | Libre Baskerville | Special Elite | dark |
+| `midnight` | Inter | Space Grotesk | dark |
+| `terminal` | IBM Plex Mono | IBM Plex Mono | dark |
+| `playful` | Nunito | Fredoka | light |
+
+Override the theme's preferred brightness when needed:
+
+```markdown
+---
+theme: terminal
+brightness: system
+---
+```
+
+`brightness:` accepts `light`, `dark`, or `system`. `system` follows the reader's operating-system/browser preference.
 
 To choose another typeface, browse [Google Fonts](https://fonts.google.com/), copy the family name exactly, and put it in `font_body:` or `font_heading:`. While `npm run dev` is running, BIF downloads the required font files into the selected story's generated `bif-assets/` directory and rewrites the Google Fonts stylesheet to use those local files. Readers of the published story therefore do not need to contact Google Fonts.
 
