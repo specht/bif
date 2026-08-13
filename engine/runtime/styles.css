@@ -212,6 +212,18 @@ button.pagelink {
     margin: 0;
 }
 
+/* Page-changing choices carry the legacy `pagelink` class on their <li>.
+   The generic .pagelink rule below uses overflow:hidden and margins for old
+   transition behavior, which clips the child choice's shadow and makes it look
+   different from local-choice buttons. Inside the modern live choice list,
+   the list itself owns spacing and the child owns all button visuals. */
+.live-choice-set > li.pagelink {
+    max-height: none;
+    overflow: visible;
+    margin: 0;
+    transition: none;
+}
+
 .live-choice-set > li > .story-choice,
 .committed-choice-turn > .story-choice {
     box-sizing: border-box;
