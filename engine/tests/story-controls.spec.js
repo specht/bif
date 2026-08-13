@@ -39,7 +39,8 @@ test('compact controls are accessible chrome outside the transcript in both loca
     const restart = document.querySelector('.story-restart-control').getBoundingClientRect();
     return { layerHeight: layer.height, controlsRight: controls.right, paneRight: pane.right, size: restart.width };
   });
-  expect(geometry.layerHeight).toBe(0);
+  expect(geometry.layerHeight).toBeGreaterThan(0);
+  expect(geometry.layerHeight).toBeLessThanOrEqual(60);
   expect(geometry.controlsRight).toBeLessThan(geometry.paneRight);
   expect(geometry.size).toBeGreaterThanOrEqual(32);
   expect(geometry.size).toBeLessThanOrEqual(40);
@@ -51,6 +52,41 @@ test('compact controls are accessible chrome outside the transcript in both loca
   await expect(game).toHaveAttribute('title', 'Open game view');
   await expect(game).toHaveText('');
   expect(await page.locator('.story-controls').evaluate(element => element.closest('#game_pane') !== null)).toBe(true);
+});
+
+
+test('opening heading wraps around the floating controls instead of sitting underneath them', async ({ page }) => {
+  await useStory(page);
+  await page.setViewportSize({ width: 500, height: 500 });
+  await page.route(/\/engine\/test-fixtures\/player-basic\/pages\/1\.md(?:\?.*)?$/, route => route.fulfill({
+    contentType: 'text/markdown',
+    body: '# Nach Schulschluss\n\nDu willst gerade gehen, da fällt dir ein: Deine Projektmappe liegt noch im Materialschrank.\n',
+  }));
+  await page.goto('/?mode=game');
+  await expect(page.getByRole('heading', { name: 'Nach Schulschluss' })).toBeVisible();
+  const geometry = await page.evaluate(() => {
+    const controls = document.querySelector('.story-controls').getBoundingClientRect();
+    const heading = document.querySelector('#game_pane h1');
+    const range = document.createRange();
+    range.selectNodeContents(heading);
+    const textRects = [...range.getClientRects()].map(rect => ({
+      left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+    }));
+    return {
+      controls: { left: controls.left, right: controls.right, top: controls.top, bottom: controls.bottom },
+      textRects,
+      float: getComputedStyle(document.querySelector('.story-controls-layer')).float,
+    };
+  });
+  expect(geometry.float).not.toBe('none');
+  expect(geometry.textRects.length).toBeGreaterThan(0);
+  for (const rect of geometry.textRects) {
+    const overlaps = rect.right > geometry.controls.left
+      && rect.left < geometry.controls.right
+      && rect.bottom > geometry.controls.top
+      && rect.top < geometry.controls.bottom;
+    expect(overlaps).toBe(false);
+  }
 });
 
 test('toolbar keeps an opaque theme surface and fully opaque icons over story content', async ({ page }) => {

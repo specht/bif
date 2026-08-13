@@ -46,4 +46,9 @@ test('documented story themes exist in the reader stylesheet', () => {
   assert.match(styles, /--story-heading-font/);
   assert.match(styles, /data-story-brightness=["']dark["']/);
   assert.match(readme, /brightness:\s*(?:light|dark|system)/);
+  assert.match(readme, /accent:/);
+  assert.match(readme, /background:/);
+  assert.match(manual, /accent/);
+  assert.match(manual, /background/);
+  assert.match(styles, /--story-accent-color/);
 });

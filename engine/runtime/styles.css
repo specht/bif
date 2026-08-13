@@ -252,9 +252,9 @@ button.pagelink {
 }
 
 .story-choice.committed-choice.chosen {
-    border: 1px solid var(--border-color);
+    border: 1px solid color-mix(in srgb, var(--story-accent-color) 30%, var(--border-color));
     border-radius: 4px;
-    background-color: var(--surface-1);
+    background-color: color-mix(in srgb, var(--story-accent-color) 10%, var(--surface-1));
 }
 
 .choice-result {
@@ -431,6 +431,12 @@ button {
     color: var(--story-accent-color);
 }
 
+#game_pane a:focus-visible,
+#game_pane button:focus-visible,
+#game_pane .story-passage:focus-visible {
+    outline-color: color-mix(in srgb, var(--story-accent-color) 70%, var(--fg-color));
+}
+
 #game_pane .story-choice,
 #game_pane button.pagelink {
     border-radius: var(--story-choice-radius);
@@ -438,12 +444,16 @@ button {
 }
 
 .story-controls-layer {
+    /* Stay in the reader flow so the opening text wraps around the controls.
+       Once the story scrolls, sticky positioning keeps the same compact chrome
+       available without reserving a permanent toolbar row. */
     position: sticky;
     top: 0.35rem;
     z-index: 20;
-    height: 0;
-    display: flex;
-    justify-content: flex-end;
+    float: right;
+    width: max-content;
+    margin-inline-start: 0.75rem;
+    margin-block-end: 0.5rem;
     pointer-events: none;
 }
 
@@ -525,18 +535,19 @@ body.dev .story-controls {
 .hold-confirm-control.is-confirming::after { opacity: 0.7; }
 
 .story-icon-button:hover {
-    border-color: var(--mix-70);
-    background: var(--mix-90);
+    border-color: color-mix(in srgb, var(--story-accent-color) 30%, var(--mix-70));
+    background: color-mix(in srgb, var(--story-accent-color) 7%, var(--mix-90));
     color: var(--fg-color);
 }
 
 .story-icon-button:focus-visible,
 .story-play-again:focus-visible {
-    outline: 2px solid var(--fg-color);
+    outline: 2px solid color-mix(in srgb, var(--story-accent-color) 70%, var(--fg-color));
     outline-offset: 2px;
 }
 
 .story-ending-actions {
+    clear: both;
     padding-block: 1rem 0.5rem;
     text-align: center;
 }
@@ -1123,8 +1134,8 @@ body,
 }
 
 .story-choice:hover {
-    background-color: var(--surface-2);
-    border-color: var(--border-strong);
+    background-color: color-mix(in srgb, var(--story-accent-color) 8%, var(--surface-2));
+    border-color: color-mix(in srgb, var(--story-accent-color) 38%, var(--border-strong));
 }
 
 .project-analysis-note,

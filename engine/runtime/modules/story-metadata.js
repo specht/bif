@@ -16,7 +16,7 @@
 
     const BUNDLED_FONTS = Object.freeze(new Set(['IBM Plex Sans', 'IBM Plex Mono']));
     const STORY_BRIGHTNESSES = Object.freeze(new Set(['light', 'dark', 'system']));
-    const KNOWN_METADATA = new Set(['title', 'theme', 'brightness', 'font_body', 'font_heading']);
+    const KNOWN_METADATA = new Set(['title', 'theme', 'brightness', 'accent', 'background', 'font_body', 'font_heading']);
 
     function unquote(value) {
         const trimmed = value.trim();
@@ -55,6 +55,12 @@
             && value.length > 0
             && value.length <= 100
             && !/[\u0000-\u001f\u007f]/.test(value);
+    }
+
+    function normalizeHexColor(value) {
+        if (typeof value !== 'string') return null;
+        const trimmed = value.trim();
+        return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed.toLowerCase() : null;
     }
 
     function parseFrontMatter(markdown, sourcePath) {
@@ -107,6 +113,8 @@
             fontHeading: appearance.fontHeading || defaults.headingFont,
             generic: defaults.generic,
             brightness: appearance.brightness || defaults.brightness,
+            accent: normalizeHexColor(appearance.accent),
+            background: normalizeHexColor(appearance.background),
         };
     }
 
@@ -136,6 +144,17 @@
             brightness = null;
         }
 
+        let accent = parsed.values.accent?.value || null;
+        let background = parsed.values.background?.value || null;
+        if (accent && !normalizeHexColor(accent)) {
+            issues.push(issue('invalid-color', `Invalid accent color in ${sourcePath}. Use a six-digit hex color like #d91e36.`, parsed.values.accent.line));
+            accent = null;
+        }
+        if (background && !normalizeHexColor(background)) {
+            issues.push(issue('invalid-color', `Invalid background color in ${sourcePath}. Use a six-digit hex color like #18141a.`, parsed.values.background.line));
+            background = null;
+        }
+
         let fontBody = parsed.values.font_body?.value || null;
         let fontHeading = parsed.values.font_heading?.value || null;
         if (fontBody && !validFontName(fontBody)) {
@@ -153,7 +172,7 @@
             issues.push(issue('missing-story-title', `No game title found in ${sourcePath}. Add a front-matter title or a level-one heading. Using “${FALLBACK_TITLE}”.`));
         }
 
-        const appearance = { theme, brightness, fontBody, fontHeading };
+        const appearance = { theme, brightness, accent: normalizeHexColor(accent), background: normalizeHexColor(background), fontBody, fontHeading };
         return {
             title,
             titleSource: frontMatterTitle ? 'front-matter' : heading ? 'h1' : 'fallback',

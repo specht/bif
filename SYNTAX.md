@@ -15,6 +15,8 @@ The optional front matter at the top of `1.md` contains story-wide settings. It 
 ```markdown
 ---
 theme: paper
+accent: "#7a432b"
+background: "#f7f0e2"
 font_body: Literata
 font_heading: DM Serif Display
 ---
@@ -29,8 +31,12 @@ The supported front-matter settings are:
 - `title`: optional title override
 - `theme`: reader theme
 - `brightness`: optional `light`, `dark`, or `system` override
+- `accent`: optional six-digit hex accent color such as `#ff7a18`
+- `background`: optional six-digit hex background color such as `#18141a`
 - `font_body`: body and choice font
 - `font_heading`: heading font
+
+`accent` changes links and related reader highlights. `background` replaces the theme's base background while BIF derives a contrasting text color plus matching surfaces and borders. This keeps a custom background readable without exposing foreground, border, and surface colors as separate settings. When `background` is set, its lightness determines whether those derived colors use a light or dark treatment.
 
 Write ordinary Markdown after the front matter. The title comes from `title` metadata or the first H1 in `1.md`:
 

@@ -949,6 +949,76 @@ function cssFontStack(family, generic) {
     return `"${escaped}", ${generic}`;
 }
 
+function hexColor(value) {
+    if (typeof value !== 'string') return null;
+    const normalized = value.trim().toLowerCase();
+    return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : null;
+}
+
+function relativeLuminance(value) {
+    const color = hexColor(value);
+    if (!color) return 0;
+    const components = [1, 3, 5].map(index => parseInt(color.slice(index, index + 2), 16) / 255);
+    const [r, g, b] = components.map(component => component <= 0.04045
+        ? component / 12.92
+        : ((component + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrastRatio(left, right) {
+    const a = relativeLuminance(left);
+    const b = relativeLuminance(right);
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+function customBackgroundPalette(background) {
+    const bg = hexColor(background);
+    if (!bg) return null;
+    const darkInk = '#181818';
+    const lightInk = '#f7f7f7';
+    const fg = contrastRatio(bg, darkInk) >= contrastRatio(bg, lightInk) ? darkInk : lightInk;
+    const dark = fg === lightInk;
+    return {
+        colorScheme: dark ? 'dark' : 'light',
+        properties: {
+            '--bg-color': bg,
+            '--fg-color': fg,
+            '--surface-1': 'color-mix(in srgb, var(--bg-color) 94%, var(--fg-color))',
+            '--surface-2': 'color-mix(in srgb, var(--bg-color) 89%, var(--fg-color))',
+            '--surface-3': 'color-mix(in srgb, var(--bg-color) 83%, var(--fg-color))',
+            '--border-color': 'color-mix(in srgb, var(--bg-color) 70%, var(--fg-color))',
+            '--border-strong': 'color-mix(in srgb, var(--bg-color) 55%, var(--fg-color))',
+            '--muted-color': 'color-mix(in srgb, var(--bg-color) 42%, var(--fg-color))',
+            '--shadow-color': dark ? 'rgba(0, 0, 0, 0.65)' : 'rgba(0, 0, 0, 0.18)',
+            '--story-heading-color': 'var(--fg-color)',
+        },
+    };
+}
+
+function setOptionalStyleProperty(style, name, value) {
+    if (value) style.setProperty(name, value);
+    else style.removeProperty(name);
+}
+
+function applyCustomStoryColors(effective) {
+    const targets = devMode ? [el.gamePane.style] : [el.body.style, el.gamePane.style];
+    const palette = customBackgroundPalette(effective.background);
+    const paletteProperties = [
+        '--bg-color', '--fg-color', '--surface-1', '--surface-2', '--surface-3',
+        '--border-color', '--border-strong', '--muted-color', '--shadow-color', '--story-heading-color',
+    ];
+    for (const style of targets) {
+        setOptionalStyleProperty(style, '--story-accent-color', hexColor(effective.accent));
+        if (palette) {
+            for (const [name, value] of Object.entries(palette.properties)) style.setProperty(name, value);
+            style.colorScheme = palette.colorScheme;
+        } else {
+            for (const name of paletteProperties) style.removeProperty(name);
+            style.removeProperty('color-scheme');
+        }
+    }
+}
+
 function ensureStoryFontStylesheet(families) {
     const id = 'bif-story-fonts';
     let link = document.getElementById(id);
@@ -975,6 +1045,7 @@ function applyStoryAppearance(metadata) {
     updateStoryBrightness();
     el.gamePane.style.setProperty('--story-body-font', cssFontStack(effective.fontBody, effective.generic));
     el.gamePane.style.setProperty('--story-heading-font', cssFontStack(effective.fontHeading, effective.generic));
+    applyCustomStoryColors(effective);
     ensureStoryFontStylesheet(BifStoryMetadata.googleFontFamilies(appearance));
 }
 

@@ -108,7 +108,6 @@ test('story front matter applies a theme and separate bundled body and heading f
   expect(fonts.heading).toContain('IBM Plex Sans');
 });
 
-
 test('terminal theme defaults to dark even when the system preference is light', async ({ page }) => {
   await useFixture(page, 'engine/test-fixtures/player-basic/pages');
   await page.emulateMedia({ colorScheme: 'light' });
@@ -145,6 +144,35 @@ test('brightness system follows changes to the system color scheme', async ({ pa
   await expect(page.locator('html')).toHaveAttribute('data-story-brightness', 'light');
   await page.emulateMedia({ colorScheme: 'dark' });
   await expect(page.locator('html')).toHaveAttribute('data-story-brightness', 'dark');
+});
+
+
+test('accent and background metadata customize the theme while keeping readable derived colors', async ({ page }) => {
+  await useFixture(page, 'engine/test-fixtures/player-basic/pages');
+  await page.route(/\/engine\/test-fixtures\/player-basic\/pages\/1\.md(?:\?.*)?$/, route => route.fulfill({
+    contentType: 'text/markdown',
+    body: '---\ntheme: mystery\naccent: "#ff7a18"\nbackground: "#18141a"\n---\n# Start\n\nStyled story.\n',
+  }));
+  await page.goto('/?mode=game');
+  await expect(page.getByRole('heading', { name: 'Start' })).toBeVisible();
+  const colors = await page.evaluate(() => {
+    const pane = document.getElementById('game_pane');
+    const style = getComputedStyle(pane);
+    return {
+      accent: style.getPropertyValue('--story-accent-color').trim(),
+      background: style.getPropertyValue('--bg-color').trim(),
+      foreground: style.getPropertyValue('--fg-color').trim(),
+      renderedBackground: style.backgroundColor,
+      renderedForeground: style.color,
+      colorScheme: style.colorScheme,
+    };
+  });
+  expect(colors.accent).toBe('#ff7a18');
+  expect(colors.background).toBe('#18141a');
+  expect(colors.foreground).toBe('#f7f7f7');
+  expect(colors.renderedBackground).toBe('rgb(24, 20, 26)');
+  expect(colors.renderedForeground).toBe('rgb(247, 247, 247)');
+  expect(colors.colorScheme).toBe('dark');
 });
 
 test('Google font metadata makes the reader request only the story-local generated stylesheet', async ({ page }) => {

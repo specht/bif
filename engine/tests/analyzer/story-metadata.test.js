@@ -51,12 +51,13 @@ test('config path selects the directory and title comes from page 1', async () =
   assert.equal(result.diagnostics.some(item => item.code === 'missing-story-title'), false);
 });
 
-
 test('story metadata resolves themes and separate body and heading fonts', () => {
   const metadata = resolveStoryMetadata('---\ntheme: mystery\nfont_body: "Atkinson Hyperlegible"\nfont_heading: Special Elite\n---\n# Door\n');
   assert.deepEqual(metadata.appearance, {
     theme: 'mystery',
     brightness: null,
+    accent: null,
+    background: null,
     fontBody: 'Atkinson Hyperlegible',
     fontHeading: 'Special Elite',
   });
@@ -65,7 +66,6 @@ test('story metadata resolves themes and separate body and heading fonts', () =>
   assert.deepEqual(googleFontFamilies(metadata.appearance), ['Atkinson Hyperlegible', 'Special Elite']);
   assert.equal(metadata.issues.length, 0);
 });
-
 
 test('themes provide brightness defaults and story metadata can override them', () => {
   assert.equal(effectiveAppearance({ theme: 'default' }).brightness, 'system');
@@ -99,4 +99,18 @@ test('themes provide font pairs and invalid themes fall back safely', () => {
   const invalid = resolveStoryMetadata('---\ntheme: definitely-not-a-theme\n---\n# Story\n');
   assert.equal(invalid.appearance.theme, 'default');
   assert.ok(invalid.issues.some(item => item.code === 'unknown-theme'));
+});
+
+test('story metadata accepts accent and background colors and rejects malformed values', () => {
+  const valid = resolveStoryMetadata('---\naccent: "#D91E36"\nbackground: "#18141A"\n---\n# Door\n');
+  assert.equal(valid.appearance.accent, '#d91e36');
+  assert.equal(valid.appearance.background, '#18141a');
+  assert.equal(valid.effectiveAppearance.accent, '#d91e36');
+  assert.equal(valid.effectiveAppearance.background, '#18141a');
+  assert.equal(valid.issues.length, 0);
+
+  const invalid = resolveStoryMetadata('---\naccent: tomato\nbackground: "#12345"\n---\n# Door\n');
+  assert.equal(invalid.appearance.accent, null);
+  assert.equal(invalid.appearance.background, null);
+  assert.equal(invalid.issues.filter(item => item.code === 'invalid-color').length, 2);
 });
