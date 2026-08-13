@@ -42,7 +42,7 @@ async function analyzeStory(projectRoot = process.cwd(), options = {}) {
   const pagesDirectory = path.resolve(root, config.pagesPath);
   const pagesPathLocation = config.pagesPathLocation || { line: 1, column: 1 };
   let storyTitle = FALLBACK_TITLE;
-  let storyAppearance = { theme: "default", brightness: null, accent: null, background: null, fontBody: null, fontHeading: null };
+  let storyAppearance = { theme: "default", brightness: null, accent: null, background: null, text: null, fontBody: null, fontHeading: null };
   if (!pagesDirectory.startsWith(`${root}${path.sep}`) && pagesDirectory !== root) {
     diagnostics.push(diagnostic("error", "pages-path-outside-project", "config.js", pagesPathLocation.line, pagesPathLocation.column, `Configured story path escapes the project: ${config.pagesPath}`, pagesPathLocation));
     return finish(root, { ...config, title: FALLBACK_TITLE, startPage: "1" }, [], [], diagnostics, 0, sourceEntries, manifestEntries);
@@ -214,7 +214,7 @@ function finish(root, project, pages, edges, diagnostics, reachablePages = 0, so
     version: 1,
     contentHash: crypto.createHash("sha256").update(JSON.stringify(sourceEntries)).digest("hex"),
     inputManifest: [...manifestEntries].sort(([a], [b]) => a.localeCompare(b)).map(([file, sha256]) => ({ path: file, sha256 })),
-    project: { root: ".", title: project.title, pagesPath: project.pagesPath, startPage: project.startPage, appearance: project.appearance || { theme: "default", brightness: null, accent: null, background: null, fontBody: null, fontHeading: null } },
+    project: { root: ".", title: project.title, pagesPath: project.pagesPath, startPage: project.startPage, appearance: project.appearance || { theme: "default", brightness: null, accent: null, background: null, text: null, fontBody: null, fontHeading: null } },
     summary: {
       pages: pages.length,
       reachablePages,

@@ -175,6 +175,28 @@ test('accent and background metadata customize the theme while keeping readable 
   expect(colors.colorScheme).toBe('dark');
 });
 
+
+
+test('text metadata overrides a theme foreground without requiring a custom background', async ({ page }) => {
+  await useFixture(page, 'engine/test-fixtures/player-basic/pages');
+  await page.route(/\/engine\/test-fixtures\/player-basic\/pages\/1\.md(?:\?.*)?$/, route => route.fulfill({
+    contentType: 'text/markdown',
+    body: '---\ntheme: terminal\ntext: "#ffb347"\n---\n# Start\n\nAmber terminal.\n',
+  }));
+  await page.goto('/?mode=game');
+  await expect(page.getByRole('heading', { name: 'Start' })).toBeVisible();
+  const colors = await page.evaluate(() => {
+    const pane = document.getElementById('game_pane');
+    return {
+      foreground: getComputedStyle(pane).getPropertyValue('--fg-color').trim(),
+      renderedForeground: getComputedStyle(pane).color,
+      heading: getComputedStyle(document.querySelector('#game_pane h1')).color,
+    };
+  });
+  expect(colors.foreground).toBe('#ffb347');
+  expect(colors.renderedForeground).toBe('rgb(255, 179, 71)');
+  expect(colors.heading).toBe('rgb(255, 179, 71)');
+});
 test('Google font metadata makes the reader request only the story-local generated stylesheet', async ({ page }) => {
   await useFixture(page, 'engine/test-fixtures/player-basic/pages');
   await page.route(/\/engine\/test-fixtures\/player-basic\/pages\/1\.md(?:\?.*)?$/, route => route.fulfill({

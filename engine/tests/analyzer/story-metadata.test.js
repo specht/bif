@@ -58,6 +58,7 @@ test('story metadata resolves themes and separate body and heading fonts', () =>
     brightness: null,
     accent: null,
     background: null,
+    text: null,
     fontBody: 'Atkinson Hyperlegible',
     fontHeading: 'Special Elite',
   });
@@ -101,16 +102,26 @@ test('themes provide font pairs and invalid themes fall back safely', () => {
   assert.ok(invalid.issues.some(item => item.code === 'unknown-theme'));
 });
 
-test('story metadata accepts accent and background colors and rejects malformed values', () => {
-  const valid = resolveStoryMetadata('---\naccent: "#D91E36"\nbackground: "#18141A"\n---\n# Door\n');
+test('story metadata accepts accent, background, and text colors and rejects malformed values', () => {
+  const valid = resolveStoryMetadata('---\naccent: "#D91E36"\nbackground: "#18141A"\ntext: "#FFB347"\n---\n# Door\n');
   assert.equal(valid.appearance.accent, '#d91e36');
   assert.equal(valid.appearance.background, '#18141a');
+  assert.equal(valid.appearance.text, '#ffb347');
   assert.equal(valid.effectiveAppearance.accent, '#d91e36');
   assert.equal(valid.effectiveAppearance.background, '#18141a');
+  assert.equal(valid.effectiveAppearance.text, '#ffb347');
   assert.equal(valid.issues.length, 0);
 
-  const invalid = resolveStoryMetadata('---\naccent: tomato\nbackground: "#12345"\n---\n# Door\n');
+  const invalid = resolveStoryMetadata('---\naccent: tomato\nbackground: "#12345"\ntext: green\n---\n# Door\n');
   assert.equal(invalid.appearance.accent, null);
   assert.equal(invalid.appearance.background, null);
-  assert.equal(invalid.issues.filter(item => item.code === 'invalid-color').length, 2);
+  assert.equal(invalid.appearance.text, null);
+  assert.equal(invalid.issues.filter(item => item.code === 'invalid-color').length, 3);
+});
+
+test('story metadata warns about low contrast without changing custom colors', () => {
+  const metadata = resolveStoryMetadata('---\nbackground: "#777777"\ntext: "#888888"\n---\n# Door\n');
+  assert.equal(metadata.appearance.background, '#777777');
+  assert.equal(metadata.appearance.text, '#888888');
+  assert.ok(metadata.issues.some(item => item.code === 'low-color-contrast'));
 });

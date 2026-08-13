@@ -16,7 +16,7 @@
 
     const BUNDLED_FONTS = Object.freeze(new Set(['IBM Plex Sans', 'IBM Plex Mono']));
     const STORY_BRIGHTNESSES = Object.freeze(new Set(['light', 'dark', 'system']));
-    const KNOWN_METADATA = new Set(['title', 'theme', 'brightness', 'accent', 'background', 'font_body', 'font_heading']);
+    const KNOWN_METADATA = new Set(['title', 'theme', 'brightness', 'accent', 'background', 'text', 'font_body', 'font_heading']);
 
     function unquote(value) {
         const trimmed = value.trim();
@@ -61,6 +61,23 @@
         if (typeof value !== 'string') return null;
         const trimmed = value.trim();
         return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed.toLowerCase() : null;
+    }
+
+    function relativeLuminance(value) {
+        const color = normalizeHexColor(value);
+        if (!color) return null;
+        const components = [1, 3, 5].map(index => parseInt(color.slice(index, index + 2), 16) / 255);
+        const [r, g, b] = components.map(component => component <= 0.04045
+            ? component / 12.92
+            : ((component + 0.055) / 1.055) ** 2.4);
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+
+    function contrastRatio(left, right) {
+        const a = relativeLuminance(left);
+        const b = relativeLuminance(right);
+        if (a === null || b === null) return null;
+        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
     }
 
     function parseFrontMatter(markdown, sourcePath) {
@@ -115,6 +132,7 @@
             brightness: appearance.brightness || defaults.brightness,
             accent: normalizeHexColor(appearance.accent),
             background: normalizeHexColor(appearance.background),
+            text: normalizeHexColor(appearance.text),
         };
     }
 
@@ -146,6 +164,7 @@
 
         let accent = parsed.values.accent?.value || null;
         let background = parsed.values.background?.value || null;
+        let text = parsed.values.text?.value || null;
         if (accent && !normalizeHexColor(accent)) {
             issues.push(issue('invalid-color', `Invalid accent color in ${sourcePath}. Use a six-digit hex color like #d91e36.`, parsed.values.accent.line));
             accent = null;
@@ -153,6 +172,23 @@
         if (background && !normalizeHexColor(background)) {
             issues.push(issue('invalid-color', `Invalid background color in ${sourcePath}. Use a six-digit hex color like #18141a.`, parsed.values.background.line));
             background = null;
+        }
+        if (text && !normalizeHexColor(text)) {
+            issues.push(issue('invalid-color', `Invalid text color in ${sourcePath}. Use a six-digit hex color like #ffb347.`, parsed.values.text.line));
+            text = null;
+        }
+
+        const normalizedBackground = normalizeHexColor(background);
+        const normalizedText = normalizeHexColor(text);
+        if (normalizedBackground && normalizedText) {
+            const contrast = contrastRatio(normalizedText, normalizedBackground);
+            if (contrast !== null && contrast < 4.5) {
+                issues.push(issue(
+                    'low-color-contrast',
+                    `Low contrast between text ${normalizedText} and background ${normalizedBackground} (${contrast.toFixed(2)}:1). Aim for at least 4.5:1.`,
+                    parsed.values.text.line,
+                ));
+            }
         }
 
         let fontBody = parsed.values.font_body?.value || null;
@@ -172,7 +208,7 @@
             issues.push(issue('missing-story-title', `No game title found in ${sourcePath}. Add a front-matter title or a level-one heading. Using “${FALLBACK_TITLE}”.`));
         }
 
-        const appearance = { theme, brightness, accent: normalizeHexColor(accent), background: normalizeHexColor(background), fontBody, fontHeading };
+        const appearance = { theme, brightness, accent: normalizeHexColor(accent), background: normalizedBackground, text: normalizedText, fontBody, fontHeading };
         return {
             title,
             titleSource: frontMatterTitle ? 'front-matter' : heading ? 'h1' : 'fallback',

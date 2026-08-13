@@ -73,6 +73,7 @@ Story-wide appearance belongs in the front matter at the top of `1.md`. It is op
 theme: mystery
 accent: "#d91e36"
 background: "#18141a"
+text: "#f2e9e4"
 font_body: Libre Baskerville
 font_heading: Special Elite
 ---
@@ -111,10 +112,11 @@ Students can also tweak a theme without defining all of its colors themselves:
 theme: midnight
 accent: "#ff7a18"
 background: "#18141a"
+text: "#ffb347"
 ---
 ```
 
-`accent:` changes links, focus highlights, and choice accents. `background:` changes the reader's base background; BIF automatically derives readable text, surfaces, and borders from it. Both settings accept six-digit hex colors (`#RRGGBB`). If `background:` is present, its actual lightness determines the readable foreground palette even if the selected theme normally prefers another brightness.
+`accent:` changes links, focus highlights, and choice accents. `background:` changes the reader's base background, and `text:` changes the normal text and heading color. All three accept six-digit hex colors (`#RRGGBB`). BIF derives surfaces, borders, and muted colors from the chosen background/text pair instead of exposing every palette detail separately. If `background:` is set without `text:`, BIF automatically chooses a high-contrast text color. If both are set and their contrast is low, the Problems view warns about it rather than silently changing the student's colors.
 
 To choose another typeface, browse [Google Fonts](https://fonts.google.com/), copy the family name exactly, and put it in `font_body:` or `font_heading:`. While `npm run dev` is running, BIF downloads the required font files into the selected story's generated `bif-assets/` directory and rewrites the Google Fonts stylesheet to use those local files. Readers of the published story therefore do not need to contact Google Fonts.
 

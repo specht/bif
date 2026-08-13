@@ -971,28 +971,34 @@ function contrastRatio(left, right) {
     return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
-function customBackgroundPalette(background) {
+function customStoryPalette(background, text) {
     const bg = hexColor(background);
-    if (!bg) return null;
+    const explicitText = hexColor(text);
+    if (!bg && !explicitText) return null;
+
     const darkInk = '#181818';
     const lightInk = '#f7f7f7';
-    const fg = contrastRatio(bg, darkInk) >= contrastRatio(bg, lightInk) ? darkInk : lightInk;
-    const dark = fg === lightInk;
-    return {
-        colorScheme: dark ? 'dark' : 'light',
-        properties: {
-            '--bg-color': bg,
-            '--fg-color': fg,
-            '--surface-1': 'color-mix(in srgb, var(--bg-color) 94%, var(--fg-color))',
-            '--surface-2': 'color-mix(in srgb, var(--bg-color) 89%, var(--fg-color))',
-            '--surface-3': 'color-mix(in srgb, var(--bg-color) 83%, var(--fg-color))',
-            '--border-color': 'color-mix(in srgb, var(--bg-color) 70%, var(--fg-color))',
-            '--border-strong': 'color-mix(in srgb, var(--bg-color) 55%, var(--fg-color))',
-            '--muted-color': 'color-mix(in srgb, var(--bg-color) 42%, var(--fg-color))',
-            '--shadow-color': dark ? 'rgba(0, 0, 0, 0.65)' : 'rgba(0, 0, 0, 0.18)',
-            '--story-heading-color': 'var(--fg-color)',
-        },
+    const fg = explicitText || (contrastRatio(bg, darkInk) >= contrastRatio(bg, lightInk) ? darkInk : lightInk);
+    const properties = {
+        '--fg-color': fg,
+        '--surface-1': 'color-mix(in srgb, var(--bg-color) 94%, var(--fg-color))',
+        '--surface-2': 'color-mix(in srgb, var(--bg-color) 89%, var(--fg-color))',
+        '--surface-3': 'color-mix(in srgb, var(--bg-color) 83%, var(--fg-color))',
+        '--border-color': 'color-mix(in srgb, var(--bg-color) 70%, var(--fg-color))',
+        '--border-strong': 'color-mix(in srgb, var(--bg-color) 55%, var(--fg-color))',
+        '--muted-color': 'color-mix(in srgb, var(--bg-color) 42%, var(--fg-color))',
+        '--story-heading-color': 'var(--fg-color)',
     };
+
+    let colorScheme = null;
+    if (bg) {
+        properties['--bg-color'] = bg;
+        const dark = relativeLuminance(bg) < 0.4;
+        properties['--shadow-color'] = dark ? 'rgba(0, 0, 0, 0.65)' : 'rgba(0, 0, 0, 0.18)';
+        colorScheme = dark ? 'dark' : 'light';
+    }
+
+    return { colorScheme, properties };
 }
 
 function setOptionalStyleProperty(style, name, value) {
@@ -1002,19 +1008,18 @@ function setOptionalStyleProperty(style, name, value) {
 
 function applyCustomStoryColors(effective) {
     const targets = devMode ? [el.gamePane.style] : [el.body.style, el.gamePane.style];
-    const palette = customBackgroundPalette(effective.background);
+    const palette = customStoryPalette(effective.background, effective.text);
     const paletteProperties = [
         '--bg-color', '--fg-color', '--surface-1', '--surface-2', '--surface-3',
         '--border-color', '--border-strong', '--muted-color', '--shadow-color', '--story-heading-color',
     ];
     for (const style of targets) {
         setOptionalStyleProperty(style, '--story-accent-color', hexColor(effective.accent));
+        for (const name of paletteProperties) style.removeProperty(name);
+        style.removeProperty('color-scheme');
         if (palette) {
             for (const [name, value] of Object.entries(palette.properties)) style.setProperty(name, value);
-            style.colorScheme = palette.colorScheme;
-        } else {
-            for (const name of paletteProperties) style.removeProperty(name);
-            style.removeProperty('color-scheme');
+            if (palette.colorScheme) style.colorScheme = palette.colorScheme;
         }
     }
 }
