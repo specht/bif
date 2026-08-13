@@ -212,6 +212,12 @@ button.pagelink {
     margin: 0;
 }
 
+/* A conditionally unavailable choice may leave an empty <li> behind after
+   rendering. Do not let that invisible flex item consume a choice gap. */
+.live-choice-set > li:not(:has(> .story-choice)) {
+    display: none;
+}
+
 /* Page-changing choices carry the legacy `pagelink` class on their <li>.
    The generic .pagelink rule below uses overflow:hidden and margins for old
    transition behavior, which clips the child choice's shadow and makes it look
