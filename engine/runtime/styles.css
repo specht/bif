@@ -248,7 +248,9 @@ button.pagelink {
 .committed-choice-turn .story-choice:hover {
     background-color: var(--bg-color);
     border-color: var(--mix-70);
-    box-shadow: 0 0.05em 0.15em var(--shadow-color);
+    box-shadow:
+        0 1px 2px var(--story-shadow),
+        0 2px 5px var(--story-shadow-soft);
 }
 
 .story-choice.committed-choice.chosen {
@@ -441,6 +443,9 @@ button {
 #game_pane button.pagelink {
     border-radius: var(--story-choice-radius);
     font-family: var(--story-body-font);
+    box-shadow:
+        0 1px 2px var(--story-shadow),
+        0 2px 5px var(--story-shadow-soft);
 }
 
 .story-controls-layer {
@@ -493,13 +498,15 @@ body.dev .story-controls {
     min-width: 2.25rem;
     margin: 0;
     padding: 0;
-    border: 1px solid transparent;
+    border: 1px solid var(--border-color);
     border-radius: 0.4rem;
     background: var(--surface-1);
     color: var(--fg-color);
     font: inherit;
     cursor: pointer;
-    box-shadow: 1px 1px 6px rgba(0, 0, 0, 0.15);
+    box-shadow:
+        0 1px 2px var(--story-shadow),
+        0 3px 8px var(--story-shadow-soft);
 }
 
 .story-icon-button .icon {
@@ -560,12 +567,16 @@ body.dev .story-controls {
     width: auto;
     margin: 0;
     padding: 0.35rem 0.75rem;
-    border: 1px solid var(--mix-70);
-    border-radius: 0.4rem;
-    background: var(--mix-95);
     color: var(--fg-color);
     font: inherit;
     cursor: pointer;
+    border: 1px solid var(--border-color);
+    border-radius: 0.4rem;
+    background: var(--surface-1);
+
+    box-shadow:
+        0 1px 2px var(--story-shadow),
+        0 3px 8px var(--story-shadow-soft);
 }
 
 body.dev {
@@ -1226,6 +1237,8 @@ html[data-story-brightness] #game_pane {
     --border-color: color-mix(in oklab, var(--story-background) 70%, var(--story-text));
     --border-strong: color-mix(in oklab, var(--story-background) 55%, var(--story-text));
     --muted-color: color-mix(in oklab, var(--story-background) 42%, var(--story-text));
+    --story-shadow: color-mix(in oklab, transparent 78%, var(--fg-color));
+    --story-shadow-soft: color-mix(in oklab, transparent 88%, var(--fg-color));
     --story-heading-color: var(--story-text);
     --story-accent-color: var(--story-accent);
 }
