@@ -226,6 +226,42 @@ button.pagelink {
     white-space: normal;
 }
 
+/* Live choices may be rendered as either <button> (local choice) or <a>
+   (page choice). Reset element-specific browser/legacy styling here so both
+   render from exactly the same rule set. */
+#game_pane .live-choice-set > li > .story-choice {
+    -webkit-appearance: none;
+    appearance: none;
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0.75em;
+    border: 1px solid var(--border-color);
+    border-radius: var(--story-choice-radius);
+    background: var(--surface-1);
+    background-image: none;
+    color: var(--fg-color);
+    font: inherit;
+    line-height: normal;
+    text-align: left;
+    text-decoration: none;
+    white-space: normal;
+    cursor: pointer;
+    box-shadow:
+        0 1px 2px var(--story-shadow),
+        0 2px 5px var(--story-shadow-soft);
+}
+
+#game_pane .live-choice-set > li > .story-choice:hover {
+    border-color: color-mix(in srgb, var(--story-accent-color) 38%, var(--border-strong));
+    background: color-mix(in srgb, var(--story-accent-color) 8%, var(--surface-2));
+    background-image: none;
+    box-shadow:
+        0 1px 2px var(--story-shadow),
+        0 2px 5px var(--story-shadow-soft);
+}
+
 .committed-choice-turn {
     display: flex;
     flex-direction: column;
@@ -426,7 +462,6 @@ button {
 }
 
 #game_pane .story-choice,
-#game_pane ul:has(li a) li a,
 #game_pane button.pagelink {
     border: 1px solid var(--border-color);
     border-radius: var(--story-choice-radius);
@@ -439,7 +474,6 @@ button {
 }
 
 #game_pane .story-choice:hover,
-#game_pane ul:has(li a) li a:hover,
 #game_pane button.pagelink:hover {
     background-color: color-mix(in srgb, var(--story-accent-color) 8%, var(--surface-2));
     border-color: color-mix(in srgb, var(--story-accent-color) 38%, var(--border-strong));
