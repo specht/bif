@@ -1066,7 +1066,7 @@ body.dev {
                     }
 
                     .edge {
-                        opacity: 0.45;
+                        opacity: 0.35;
 
                         .graph-edge-path {
                             stroke: var(--graph-edge-color) !important;
