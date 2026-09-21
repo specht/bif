@@ -40,7 +40,7 @@ function nodeStatement(node) {
 export function buildPlayerGraphDot(structure) {
     const lines = [
         'digraph Adventure {', 'rankdir="TB"',
-        'graph [fontname="Arial", fontsize=11, bgcolor="none"]',
+        'graph [fontname="Arial", fontsize=11, bgcolor="none", nodesep=0.65, ranksep=0.65]',
         'node [shape=box, style=filled, fontname="Arial", fontsize=11, color="#000000"]',
         'edge [fontname="Arial", fontsize=11, penwidth=1, style="solid", color="#000000"]',
     ];
@@ -56,10 +56,23 @@ export function buildPlayerGraphDot(structure) {
     for (const node of structure.nodes.filter(node => !grouped.has(node.nodeId))) {
         lines.push(nodeStatement(node).replace(']', ', fillcolor="#cccccc", color="#888888"]'));
     }
+    // Graphviz otherwise draws opposite-direction edges along the same short
+    // line when their nodes share a rank. Give each direction a different side
+    // of the nodes, without changing edge ids or the runtime navigation model.
+    const directedPairs = new Set(structure.edges.map(edge =>
+        JSON.stringify([edge.sourceNodeId, edge.targetNodeId])));
     for (const edge of structure.edges) {
         const classes = ['edge', edge.broken ? 'broken' : '', edge.condition ? 'conditional' : '', edge.diagnostics.some(item => item.severity === 'error') ? 'has-error' : '', edge.diagnostics.some(item => item.severity === 'warning') ? 'has-warning' : ''].filter(Boolean).join(' ');
         const marker = edge.broken || edge.diagnostics.some(item => item.severity === 'error') ? ', xlabel="Error"' : edge.diagnostics.some(item => item.severity === 'warning') ? ', xlabel="Warning"' : '';
-        lines.push(`"${escapeDot(edge.sourceNodeId)}" -> "${escapeDot(edge.targetNodeId)}" [id="${escapeDot(edge.edgeId)}", class="${classes}"${marker}]`);
+        const reciprocal = edge.sourceNodeId !== edge.targetNodeId &&
+            directedPairs.has(JSON.stringify([edge.targetNodeId, edge.sourceNodeId]));
+        // Use a stable direction choice independent of Graphviz's left/right
+        // placement. Other edges keep their automatic routing.
+        const ports = !reciprocal ? '' :
+            String(edge.sourceNodeId) < String(edge.targetNodeId)
+                ? ', tailport="n", headport="n"'
+                : ', tailport="s", headport="s"';
+        lines.push(`"${escapeDot(edge.sourceNodeId)}" -> "${escapeDot(edge.targetNodeId)}" [id="${escapeDot(edge.edgeId)}", class="${classes}"${marker}${ports}]`);
     }
     lines.push('}');
     return lines.join('\n');

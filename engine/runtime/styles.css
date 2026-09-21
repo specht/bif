@@ -1066,7 +1066,7 @@ body.dev {
                     }
 
                     .edge {
-                        opacity: 0.28;
+                        opacity: 0.45;
 
                         .graph-edge-path {
                             stroke: var(--graph-edge-color) !important;
@@ -1079,6 +1079,7 @@ body.dev {
 
                         &.active,
                         &.available,
+                        &:hover,
                         &.graph-selected { opacity: 1; }
 
                         &.active .graph-edge-path {
